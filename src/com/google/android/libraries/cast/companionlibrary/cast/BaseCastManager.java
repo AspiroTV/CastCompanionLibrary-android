@@ -130,6 +130,7 @@ public abstract class BaseCastManager
     protected CastMediaRouterCallback mMediaRouterCallback;
     protected CastDevice mSelectedCastDevice;
     protected String mDeviceName;
+    protected String mDeviceId;
     protected PreferenceAccessor mPreferenceAccessor;
 
     private final Set<BaseCastConsumer> mBaseCastConsumers = new CopyOnWriteArraySet<>();
@@ -263,6 +264,7 @@ public abstract class BaseCastManager
         }
         mSelectedCastDevice = null;
         mDeviceName = null;
+        mDeviceId = null;
 
         String message = "disconnectDevice() Disconnect Reason: ";
         int reason;
@@ -337,6 +339,7 @@ public abstract class BaseCastManager
     private void setDevice(CastDevice device) {
         mSelectedCastDevice = device;
         mDeviceName = mSelectedCastDevice.getFriendlyName();
+        mDeviceId = mSelectedCastDevice.getDeviceId();
 
         if (mApiClient == null) {
             LOGD(TAG, "acquiring a connection to Google Play services for " + mSelectedCastDevice);
@@ -546,6 +549,14 @@ public abstract class BaseCastManager
      */
     public final String getDeviceName() {
         return mDeviceName;
+    }
+
+    /**
+     * Returns the assigned id of the device, or <code>null</code> if no device is
+     * connected.
+     */
+    public final String getDeviceId() {
+        return mDeviceId;
     }
 
     /**

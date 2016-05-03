@@ -24,9 +24,26 @@
         android:layout_marginLeft="@dimen/ccl_intro_text_margin"
         android:layout_marginRight="@dimen/ccl_intro_text_margin"
         android:layout_marginEnd="@dimen/ccl_intro_text_margin"
+        android:paddingLeft="20dp"
+        android:paddingRight="20dp"
+        android:text="Touch this icon to cast videoes to your TV"
+        android:textAlignment="center"
+        android:textSize="14pt"
+        android:gravity="center_horizontal"
         android:textAppearance="@style/TextAppearance.CCLIntroOverlay.Title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
+
+    <ImageView
+        android:layout_width="70dp"
+        android:layout_height="70dp"
+        android:src="@drawable/ic_cast_white"
+        android:layout_centerHorizontal="true"
+        android:layout_above="@id/textTitle"
+        android:gravity="center"
+        android:scaleType="fitCenter"
+        android:layout_marginBottom="70dp"
+        />
 
     <TextView
         android:id="@+id/textSubtitle"
@@ -35,21 +52,29 @@
         android:layout_alignRight="@+id/textTitle"
         android:layout_alignStart="@+id/textTitle"
         android:layout_alignEnd="@+id/textTitle"
+        android:textAlignment="center"
         android:textAppearance="@style/TextAppearance.CCLIntroOverlay.Subtitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
 
-    <Button
-        android:id="@+id/button"
-        style="@style/Widget.AppCompat.Button.Colored"
+    <RelativeLayout
+        android:id="@+id/button_parent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
-        android:layout_alignParentEnd="true"
-        android:layout_alignParentRight="true"
-        android:layout_marginBottom="@dimen/ccl_intro_button_margin_bottom"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="70dp"
         android:layout_marginRight="@dimen/ccl_intro_button_margin_right"
         android:layout_marginEnd="@dimen/ccl_intro_button_margin_right"
         android:layout_marginTop="50dp"
-        android:textAppearance="@style/TextAppearance.CCLIntroOverlay.Button"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"/>
+        >
+        <!--<Button-->
+            <!--android:id="@+id/button"-->
+            <!--style="@style/Widget.AppCompat.Button.Colored"-->
+
+            <!--android:textAppearance="@style/TextAppearance.CCLIntroOverlay.Button"-->
+            <!--android:layout_width="wrap_content"-->
+            <!--android:layout_height="wrap_content"/>-->
+    </RelativeLayout>
+
 </RelativeLayout>

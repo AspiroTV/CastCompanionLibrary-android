@@ -42,6 +42,7 @@ import android.support.annotation.StringRes;
 import android.support.v7.app.MediaRouteButton;
 import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -107,7 +108,13 @@ public class IntroductoryOverlay extends RelativeLayout {
         mIsSingleTime = builder.mSingleTime;
         LayoutInflater inflater = LayoutInflater.from(mContext);
         inflater.inflate(R.layout.ccl_intro_overlay, this);
-        mButton = (Button) findViewById(R.id.button);
+
+        RelativeLayout parent = (RelativeLayout) findViewById(R.id.button_parent);
+        if (builder.mButtonLayout > 0) {
+            mButton = (Button) inflater.inflate(builder.mButtonLayout, parent, false);
+            parent.addView(mButton);
+        }
+
         mTitleText = (TextView) findViewById(R.id.textTitle);
         mSubtitleText = (TextView) findViewById(R.id.textSubtitle);
         TypedArray typedArray = mContext.getTheme()
@@ -182,14 +189,16 @@ public class IntroductoryOverlay extends RelativeLayout {
                     .getColor(R.styleable.CCLIntroOverlay_ccl_IntroButtonBackgroundColor,
                             Color.argb(0, 0, 0, 0));
 
-        mButton.setText(buttonText);
-        mButton.getBackground().setColorFilter(buttonColor, PorterDuff.Mode.MULTIPLY);
-        mButton.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                fadeOut(FADE_OUT_LENGTH_MS);
-            }
-        });
+        if (mButton != null) {
+            mButton.setText(buttonText);
+            mButton.getBackground().setColorFilter(buttonColor, PorterDuff.Mode.MULTIPLY);
+            mButton.setOnClickListener(new OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    fadeOut(FADE_OUT_LENGTH_MS);
+                }
+            });
+        }
     }
 
     private void setText(CharSequence titleText, CharSequence detailText) {
@@ -282,6 +291,7 @@ public class IntroductoryOverlay extends RelativeLayout {
         private OnOverlayDismissedListener mListener;
         private boolean mSingleTime;
         private View mView;
+        private int mButtonLayout;
 
         /**
          * The constructor for the Builder class. Note that the context passed here must be an
@@ -392,6 +402,11 @@ public class IntroductoryOverlay extends RelativeLayout {
             return this;
         }
 
+        public Builder setButtonLayout(int layout) {
+            mButtonLayout = layout;
+            return this;
+        }
+
         /**
          * Sets an {@link OnOverlayDismissedListener} listener that will be notified when the
          * overlay is dismissed by pressing on the confirmation button.
@@ -418,4 +433,5 @@ public class IntroductoryOverlay extends RelativeLayout {
     public interface OnOverlayDismissedListener {
         void onOverlayDismissed();
     }
+
 }

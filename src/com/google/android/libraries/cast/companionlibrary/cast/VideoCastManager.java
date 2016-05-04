@@ -165,6 +165,7 @@ public class VideoCastManager extends BaseCastManager
 
     private static VideoCastManager sInstance;
     private Class<?> mTargetActivity;
+    private String mTargetAction;
     private final Set<IMiniController> mMiniControllers = Collections
             .synchronizedSet(new HashSet<IMiniController>());
     private AudioManager mAudioManager;
@@ -209,8 +210,10 @@ public class VideoCastManager extends BaseCastManager
             targetActivity = DEFAULT_TARGET_ACTIVITY;
         }
         mTargetActivity = targetActivity;
+        mTargetAction = castConfiguration.getTargetAction();
         mPreferenceAccessor.saveStringToPreference(PREFS_KEY_CAST_ACTIVITY_NAME,
                 mTargetActivity.getName());
+
         if (!TextUtils.isEmpty(mDataNamespace)) {
             mPreferenceAccessor.saveStringToPreference(PREFS_KEY_CAST_CUSTOM_DATA_NAMESPACE,
                     mDataNamespace);
@@ -336,9 +339,21 @@ public class VideoCastManager extends BaseCastManager
     @Override
     public void onTargetActivityInvoked(Context context) throws
             TransientNetworkDisconnectionException, NoConnectionException {
-        Intent intent = new Intent(context, mTargetActivity);
-        intent.putExtra(EXTRA_MEDIA, Utils.mediaInfoToBundle(getRemoteMediaInformation()));
-        context.startActivity(intent);
+        Intent contentIntent;
+        if (!TextUtils.isEmpty(mTargetAction)) {
+            contentIntent = new Intent();
+        } else {
+            contentIntent = new Intent(mContext, mTargetActivity);
+        }
+        Bundle mediaWrapper = Utils.mediaInfoToBundle(getRemoteMediaInformation());
+        contentIntent.putExtra(VideoCastManager.EXTRA_MEDIA, mediaWrapper);
+        if (!TextUtils.isEmpty(mTargetAction)) {
+            contentIntent.setAction(mTargetAction);
+            mContext.sendBroadcast(contentIntent);
+        } else {
+            context.startActivity(contentIntent);
+        }
+
     }
 
     @Override
@@ -867,7 +882,7 @@ public class VideoCastManager extends BaseCastManager
 
     @Override
     protected void onApplicationConnected(ApplicationMetadata appMetadata,
-            String applicationStatus, String sessionId, boolean wasLaunched) {
+                                          String applicationStatus, String sessionId, boolean wasLaunched) {
         LOGD(TAG, "onApplicationConnected() reached with sessionId: " + sessionId
                 + ", and mReconnectionStatus=" + mReconnectionStatus);
         mApplicationErrorCode = NO_APPLICATION_ERROR;
@@ -2154,7 +2169,7 @@ public class VideoCastManager extends BaseCastManager
     * This is called by onQueueStatusUpdated() of RemoteMediaPlayer
     */
     private void onQueueUpdated(List<MediaQueueItem> queueItems, MediaQueueItem item,
-            int repeatMode, boolean shuffle) {
+                                int repeatMode, boolean shuffle) {
         LOGD(TAG, "onQueueUpdated() reached");
         LOGD(TAG, String.format("Queue Items size: %d, Item: %s, Repeat Mode: %d, Shuffle: %s",
                 queueItems == null ? 0 : queueItems.size(), item, repeatMode, shuffle));
@@ -2252,7 +2267,7 @@ public class VideoCastManager extends BaseCastManager
         }
         if (info == null) {
             mMediaSessionCompat.setPlaybackState(new PlaybackStateCompat.Builder()
-                .setState(PlaybackStateCompat.STATE_NONE, 0, 1.0f).build());
+                    .setState(PlaybackStateCompat.STATE_NONE, 0, 1.0f).build());
         } else {
             mMediaSessionCompat.setPlaybackState(new PlaybackStateCompat.Builder()
                 .setState(PlaybackStateCompat.STATE_PLAYING, 0, 1.0f)
@@ -2272,17 +2287,28 @@ public class VideoCastManager extends BaseCastManager
      * Returns a PendingIntent that can open the target activity for controlling the cast experience
      */
     private PendingIntent getCastControllerPendingIntent() {
+        Bundle mediaWrapper = null;
         try {
-            Bundle mediaWrapper = Utils.mediaInfoToBundle(getRemoteMediaInformation());
-            Intent contentIntent = new Intent(mContext, mTargetActivity);
-            contentIntent.putExtra(VideoCastManager.EXTRA_MEDIA, mediaWrapper);
-            return PendingIntent
-                    .getActivity(mContext, 0, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+            mediaWrapper = Utils.mediaInfoToBundle(getRemoteMediaInformation());
         } catch (TransientNetworkDisconnectionException | NoConnectionException e) {
             LOGE(TAG,
                     "getCastControllerPendingIntent(): Failed to get the remote media information");
         }
-        return null;
+        Intent contentIntent;
+        if (!TextUtils.isEmpty(mTargetAction)) {
+            contentIntent = new Intent();
+        } else {
+            contentIntent = new Intent(mContext, mTargetActivity);
+        }
+        contentIntent.putExtra(VideoCastManager.EXTRA_MEDIA, mediaWrapper);
+        if (!TextUtils.isEmpty(mTargetAction)) {
+            contentIntent.setAction(mTargetAction);
+            PendingIntent sentPI = PendingIntent.getBroadcast(mContext, 0, contentIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+            return sentPI;
+        } else {
+            return PendingIntent
+                    .getActivity(mContext, 0, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+        }
     }
 
     /*
@@ -2651,16 +2677,6 @@ public class VideoCastManager extends BaseCastManager
         super.onFailed(resourceId, statusCode);
     }
 
-    /**
-     * Returns the class for the full screen activity that can control the remote media playback.
-     * This activity will also be invoked from the notification shade. If {@code null} is returned,
-     * this library will use a default implementation.
-     *
-     * @see {@link VideoCastControllerActivity}
-     */
-    public Class<?> getTargetActivity() {
-        return mTargetActivity;
-    }
 
     /**
      * Clients can call this method to delegate handling of the volume. Clients should override

@@ -320,8 +320,7 @@ public class VideoMediaRouteControllerDialog extends MediaRouteControllerDialog 
     }
 
     private void showTargetActivity() {
-        if (mCastManager != null
-                && mCastManager.getTargetActivity() != null) {
+        if (mCastManager != null) {
             try {
                 mCastManager.onTargetActivityInvoked(mContext);
             } catch (TransientNetworkDisconnectionException | NoConnectionException e) {

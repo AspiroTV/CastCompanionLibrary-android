@@ -97,6 +97,7 @@ public class CastConfiguration {
     private int mCapabilities;
     private String mApplicationId;
     private Class<?> mTargetActivity;
+    private String mTargetAction;
     private Class<? extends Service> mCustomNotificationService;
     private List<String> mNamespaces;
     private LaunchOptions mLaunchOptions;
@@ -129,6 +130,7 @@ public class CastConfiguration {
         mNextPrevVisibilityPolicy = builder.mNextPrevVisibilityPolicy;
         mApplicationId = builder.mApplicationId;
         mTargetActivity = builder.mTargetActivity;
+        mTargetAction = builder.mTargetAction;
         if (!builder.mNamespaces.isEmpty()) {
             mNamespaces = new ArrayList<>(builder.mNamespaces);
         }
@@ -168,6 +170,10 @@ public class CastConfiguration {
 
     public Class<?> getTargetActivity() {
         return mTargetActivity;
+    }
+
+    public String getTargetAction() {
+        return mTargetAction;
     }
 
     public List<String> getNamespaces() {
@@ -214,6 +220,7 @@ public class CastConfiguration {
         private int mNextPrevVisibilityPolicy = NEXT_PREV_VISIBILITY_POLICY_DISABLED;
         private String mApplicationId;
         private Class<?> mTargetActivity;
+        private String mTargetAction;
         private List<String> mNamespaces;
         private boolean mRelaunchIfRunning;
         private Locale mLocale;
@@ -358,6 +365,16 @@ public class CastConfiguration {
             mTargetActivity = Utils.assertNotNull(targetActivity, "targetActivity");
             return this;
         }
+
+        /**
+         * Sets the "Target Action". It will be invoked if user taps on the notification content or
+         * mini-controller. The action must be linked to a BroadCast receiver.
+         */
+        public Builder setTargetAction(@NonNull String targetAction) {
+            mTargetAction = Utils.assertNotNull(targetAction, "targetAction");
+            return this;
+        }
+
 
         /**
          * (Optional) Sets the policy for the visibility/status of the Skip Next/Prev buttons in

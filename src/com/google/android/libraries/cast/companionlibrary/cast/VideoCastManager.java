@@ -506,19 +506,6 @@ public class VideoCastManager extends BaseCastManager
     }
 
     /**
-     * Determines if the media that is loaded remotely is a live stream or not.
-     *
-     * @throws TransientNetworkDisconnectionException
-     * @throws NoConnectionException
-     */
-    public final boolean isRemoteStreamLive() throws TransientNetworkDisconnectionException,
-            NoConnectionException {
-        checkConnectivity();
-        MediaInfo info = getRemoteMediaInformation();
-        return (info != null) && (info.getStreamType() == MediaInfo.STREAM_TYPE_LIVE);
-    }
-
-    /**
      * A helper method to determine if, given a player state and an idle reason (if the state is
      * idle) will warrant having a UI for remote presentation of the remote content.
      *
@@ -544,6 +531,19 @@ public class VideoCastManager extends BaseCastManager
             default:
         }
         return false;
+    }
+
+    /**
+     * Determines if the media that is loaded remotely is a live stream or not.
+     *
+     * @throws TransientNetworkDisconnectionException
+     * @throws NoConnectionException
+     */
+    public final boolean isRemoteStreamLive() throws TransientNetworkDisconnectionException,
+            NoConnectionException {
+        checkConnectivity();
+        MediaInfo info = getRemoteMediaInformation();
+        return (info != null) && (info.getStreamType() == MediaInfo.STREAM_TYPE_LIVE);
     }
 
     /*
@@ -2269,9 +2269,19 @@ public class VideoCastManager extends BaseCastManager
             mMediaSessionCompat.setPlaybackState(new PlaybackStateCompat.Builder()
                     .setState(PlaybackStateCompat.STATE_NONE, 0, 1.0f).build());
         } else {
-            mMediaSessionCompat.setPlaybackState(new PlaybackStateCompat.Builder()
-                .setState(PlaybackStateCompat.STATE_PLAYING, 0, 1.0f)
-                .setActions(PlaybackStateCompat.ACTION_PLAY_PAUSE).build());
+            boolean live = false;
+            try {
+                live = isRemoteStreamLive();
+            } catch (Exception e) {
+            }
+            if (live) {
+                mMediaSessionCompat.setPlaybackState(new PlaybackStateCompat.Builder()
+                        .setState(PlaybackStateCompat.STATE_PLAYING, 0, 1.0f).build());
+            } else {
+                mMediaSessionCompat.setPlaybackState(new PlaybackStateCompat.Builder()
+                        .setState(PlaybackStateCompat.STATE_PLAYING, 0, 1.0f)
+                        .setActions(PlaybackStateCompat.ACTION_PLAY_PAUSE).build());
+            }
         }
 
         // Update the media session's image
@@ -2405,9 +2415,14 @@ public class VideoCastManager extends BaseCastManager
                 if (pi != null) {
                     mMediaSessionCompat.setSessionActivity(pi);
                 }
-                mMediaSessionCompat.setPlaybackState(new PlaybackStateCompat.Builder()
-                        .setState(state, 0, 1.0f)
-                        .setActions(PlaybackStateCompat.ACTION_PLAY_PAUSE).build());
+                if (isRemoteStreamLive()) {
+                    mMediaSessionCompat.setPlaybackState(new PlaybackStateCompat.Builder()
+                            .setState(state, 0, 1.0f).build());
+                } else {
+                    mMediaSessionCompat.setPlaybackState(new PlaybackStateCompat.Builder()
+                            .setState(state, 0, 1.0f)
+                            .setActions(PlaybackStateCompat.ACTION_PLAY_PAUSE).build());
+                }
             }
         } catch (TransientNetworkDisconnectionException | NoConnectionException e) {
             LOGE(TAG, "Failed to set up MediaSessionCompat due to network issues", e);

@@ -2112,7 +2112,8 @@ public class VideoCastManager extends BaseCastManager
                         break;
                     case MediaStatus.IDLE_REASON_CANCELED:
                         LOGD(TAG, "onRemoteMediaPlayerStatusUpdated(): IDLE reason = CANCELLED");
-                        makeUiHidden = !isRemoteStreamLive();
+                        clearMediaSession();
+                        makeUiHidden = true;
                         break;
                     case MediaStatus.IDLE_REASON_INTERRUPTED:
                         if (mMediaStatus.getLoadingItemId() == MediaQueueItem.INVALID_ITEM_ID) {
@@ -2403,6 +2404,8 @@ public class VideoCastManager extends BaseCastManager
         if (!isConnected()) {
             return;
         }
+        LOGD(TAG, "updateMediaSession(): mMediaSessionCompat: "
+                + mMediaSessionCompat + " playing: " + playing);
         try {
             if ((mMediaSessionCompat == null) && playing) {
                 setUpMediaSession(getRemoteMediaInformation());

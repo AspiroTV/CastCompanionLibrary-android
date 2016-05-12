@@ -49,6 +49,7 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.support.v4.app.TaskStackBuilder;
 import android.support.v7.app.NotificationCompat;
+import android.text.TextUtils;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -87,6 +88,7 @@ public class VideoCastNotificationService extends Service {
     private Bitmap mVideoArtBitmap;
     private boolean mIsPlaying;
     private Class<?> mTargetActivity;
+    private String mTargetAction;
     private int mOldStatus = -1;
     protected Notification mNotification;
     private boolean mVisible;
@@ -494,12 +496,7 @@ public class VideoCastNotificationService extends Service {
                 getString(R.string.ccl_disconnect), pendingIntent).build();
     }
 
-    /**
-     * Returns the {@link PendingIntent} for showing the full screen cast controller page. We also
-     * build an appropriate "back stack" so that when user is sent to that full screen controller,
-     * clicking on the Back button would allow navigation into the app.
-     */
-    protected PendingIntent getContentIntent(MediaInfo mediaInfo) {
+    private PendingIntent getContentIntentActivityTarget(MediaInfo mediaInfo) {
         Bundle mediaWrapper = Utils.mediaInfoToBundle(mediaInfo);
         Intent contentIntent = new Intent(this, mTargetActivity);
         contentIntent.putExtra(VideoCastManager.EXTRA_MEDIA, mediaWrapper);
@@ -512,11 +509,35 @@ public class VideoCastNotificationService extends Service {
         return stackBuilder.getPendingIntent(NOTIFICATION_ID, PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
+    /**
+     * Returns the {@link PendingIntent} for showing the full screen cast controller page. We also
+     * build an appropriate "back stack" so that when user is sent to that full screen controller,
+     * clicking on the Back button would allow navigation into the app.
+     */
+    protected PendingIntent getContentIntent(MediaInfo mediaInfo) {
+        if (!TextUtils.isEmpty(mTargetAction)) {
+            return getContentIntentBroadcast(mediaInfo);
+        } else {
+            return getContentIntentActivityTarget(mediaInfo);
+        }
+    }
+
+    protected PendingIntent getContentIntentBroadcast(MediaInfo mediaInfo) {
+        Bundle mediaWrapper = Utils.mediaInfoToBundle(mediaInfo);
+        Intent contentIntent = new Intent();
+        contentIntent.putExtra(VideoCastManager.EXTRA_MEDIA, mediaWrapper);
+        PendingIntent sentPI = PendingIntent.getBroadcast(this, NOTIFICATION_ID, contentIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+
+        return sentPI;
+    }
+
+
     /*
      * Reads application ID and target activity from preference storage.
      */
     private void readPersistedData() {
         mTargetActivity = mCastManager.getCastConfiguration().getTargetActivity();
+        mTargetAction = mCastManager.getCastConfiguration().getTargetAction();
         if (mTargetActivity == null) {
             mTargetActivity = VideoCastManager.DEFAULT_TARGET_ACTIVITY;
         }

@@ -272,7 +272,7 @@ public abstract class BaseCastManager
             message += "Connectivity lost";
             reason = DISCONNECT_REASON_CONNECTIVITY;
         } else {
-            switch (mApplicationErrorCode) {
+                switch (mApplicationErrorCode) {
                 case CastStatusCodes.APPLICATION_NOT_RUNNING:
                     message += "App was taken over or not available anymore";
                     reason = DISCONNECT_REASON_APP_NOT_RUNNING;

@@ -165,7 +165,6 @@ public class VideoCastManager extends BaseCastManager
 
     private static VideoCastManager sInstance;
     private Class<?> mTargetActivity;
-    private String mTargetAction;
     private final Set<IMiniController> mMiniControllers = Collections
             .synchronizedSet(new HashSet<IMiniController>());
     private AudioManager mAudioManager;
@@ -210,7 +209,6 @@ public class VideoCastManager extends BaseCastManager
             targetActivity = DEFAULT_TARGET_ACTIVITY;
         }
         mTargetActivity = targetActivity;
-        mTargetAction = castConfiguration.getTargetAction();
         mPreferenceAccessor.saveStringToPreference(PREFS_KEY_CAST_ACTIVITY_NAME,
                 mTargetActivity.getName());
 
@@ -339,21 +337,10 @@ public class VideoCastManager extends BaseCastManager
     @Override
     public void onTargetActivityInvoked(Context context) throws
             TransientNetworkDisconnectionException, NoConnectionException {
-        Intent contentIntent;
-        if (!TextUtils.isEmpty(mTargetAction)) {
-            contentIntent = new Intent();
-        } else {
-            contentIntent = new Intent(mContext, mTargetActivity);
-        }
+        Intent contentIntent = new Intent(mContext, mTargetActivity);
         Bundle mediaWrapper = Utils.mediaInfoToBundle(getRemoteMediaInformation());
         contentIntent.putExtra(VideoCastManager.EXTRA_MEDIA, mediaWrapper);
-        if (!TextUtils.isEmpty(mTargetAction)) {
-            contentIntent.setAction(mTargetAction);
-            mContext.sendBroadcast(contentIntent);
-        } else {
-            context.startActivity(contentIntent);
-        }
-
+        context.startActivity(contentIntent);
     }
 
     @Override
@@ -1797,11 +1784,17 @@ public class VideoCastManager extends BaseCastManager
             NoConnectionException {
         checkConnectivity();
         boolean isPlaying = isRemoteMediaPlaying();
+        boolean isLive = isRemoteStreamLive();
+        LOGD(TAG, "togglePlayback() isPlaying:" + isPlaying + " isLive:" + isLive);
         if (isPlaying) {
-            pause();
+            if (isLive) {
+                stop();
+            } else {
+                pause();
+            }
         } else {
-            if (mState == MediaStatus.PLAYER_STATE_IDLE
-                    && mIdleReason == MediaStatus.IDLE_REASON_FINISHED) {
+            if ((mState == MediaStatus.PLAYER_STATE_IDLE
+                    && mIdleReason == MediaStatus.IDLE_REASON_FINISHED) || isRemoteStreamLive()) {
                 loadMedia(getRemoteMediaInformation(), true, 0);
             } else {
                 play();
@@ -2277,7 +2270,8 @@ public class VideoCastManager extends BaseCastManager
             }
             if (live) {
                 mMediaSessionCompat.setPlaybackState(new PlaybackStateCompat.Builder()
-                        .setState(PlaybackStateCompat.STATE_PLAYING, 0, 1.0f).build());
+                        .setState(PlaybackStateCompat.STATE_PLAYING, 0, 1.0f).
+                                setActions(PlaybackStateCompat.ACTION_STOP).setActions(PlaybackStateCompat.ACTION_PLAY).build());
             } else {
                 mMediaSessionCompat.setPlaybackState(new PlaybackStateCompat.Builder()
                         .setState(PlaybackStateCompat.STATE_PLAYING, 0, 1.0f)
@@ -2305,21 +2299,10 @@ public class VideoCastManager extends BaseCastManager
             LOGE(TAG,
                     "getCastControllerPendingIntent(): Failed to get the remote media information");
         }
-        Intent contentIntent;
-        if (!TextUtils.isEmpty(mTargetAction)) {
-            contentIntent = new Intent();
-        } else {
-            contentIntent = new Intent(mContext, mTargetActivity);
-        }
+        Intent contentIntent = new Intent(mContext, mTargetActivity);
         contentIntent.putExtra(VideoCastManager.EXTRA_MEDIA, mediaWrapper);
-        if (!TextUtils.isEmpty(mTargetAction)) {
-            contentIntent.setAction(mTargetAction);
-            PendingIntent sentPI = PendingIntent.getBroadcast(mContext, 0, contentIntent, PendingIntent.FLAG_CANCEL_CURRENT);
-            return sentPI;
-        } else {
-            return PendingIntent
-                    .getActivity(mContext, 0, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT);
-        }
+        return PendingIntent
+                .getActivity(mContext, 0, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
     /*
@@ -2338,7 +2321,8 @@ public class VideoCastManager extends BaseCastManager
      * full-screen image so we need to separately handle these two cases.
      */
     private void setBitmapForLockScreen(MediaInfo video) {
-        if (video == null || mMediaSessionCompat == null) {
+        //TODO HACK
+        if (video == null || mMediaSessionCompat == null || true) {
             return;
         }
         Uri imgUrl = null;
@@ -2420,7 +2404,7 @@ public class VideoCastManager extends BaseCastManager
                 }
                 if (isRemoteStreamLive()) {
                     mMediaSessionCompat.setPlaybackState(new PlaybackStateCompat.Builder()
-                            .setState(state, 0, 1.0f).build());
+                            .setState(state, 0, 1.0f).setActions(PlaybackStateCompat.ACTION_STOP).setActions(PlaybackStateCompat.ACTION_PLAY).build());
                 } else {
                     mMediaSessionCompat.setPlaybackState(new PlaybackStateCompat.Builder()
                             .setState(state, 0, 1.0f)

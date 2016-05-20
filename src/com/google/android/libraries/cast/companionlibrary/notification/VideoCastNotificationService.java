@@ -88,7 +88,6 @@ public class VideoCastNotificationService extends Service {
     private Bitmap mVideoArtBitmap;
     private boolean mIsPlaying;
     private Class<?> mTargetActivity;
-    private String mTargetAction;
     private int mOldStatus = -1;
     protected Notification mNotification;
     private boolean mVisible;
@@ -239,6 +238,7 @@ public class VideoCastNotificationService extends Service {
             @Override
             protected void onPostExecute(Bitmap bitmap) {
                 try {
+                    //TODO maybe replace this
                     mVideoArtBitmap = Utils.scaleAndCenterCropBitmap(bitmap, mDimensionInPixels,
                             mDimensionInPixels);
                     build(info, mVideoArtBitmap, mIsPlaying);
@@ -468,13 +468,13 @@ public class VideoCastNotificationService extends Service {
     protected NotificationCompat.Action getPlayPauseAction(MediaInfo info, boolean isPlaying) {
         int pauseOrStopResourceId;
         if (info.getStreamType() == MediaInfo.STREAM_TYPE_LIVE) {
-            pauseOrStopResourceId = R.drawable.ic_notification_stop_48dp;
+            pauseOrStopResourceId = R.drawable.ic_notification_stop_24dp;
         } else {
-            pauseOrStopResourceId = R.drawable.ic_notification_pause_48dp;
+            pauseOrStopResourceId = R.drawable. ic_notification_pause_24dp;
         }
         int pauseOrPlayTextResourceId = isPlaying ? R.string.ccl_pause : R.string.ccl_play;
         int pauseOrPlayResourceId = isPlaying ? pauseOrStopResourceId
-                : R.drawable.ic_notification_play_48dp;
+                : R.drawable.ic_notification_play_24dp;
         Intent intent = new Intent(this, VideoIntentReceiver.class);
         intent.setAction(ACTION_TOGGLE_PLAYBACK);
         intent.setPackage(getPackageName());
@@ -515,29 +515,14 @@ public class VideoCastNotificationService extends Service {
      * clicking on the Back button would allow navigation into the app.
      */
     protected PendingIntent getContentIntent(MediaInfo mediaInfo) {
-        if (!TextUtils.isEmpty(mTargetAction)) {
-            return getContentIntentBroadcast(mediaInfo);
-        } else {
-            return getContentIntentActivityTarget(mediaInfo);
-        }
+        return getContentIntentActivityTarget(mediaInfo);
     }
-
-    protected PendingIntent getContentIntentBroadcast(MediaInfo mediaInfo) {
-        Bundle mediaWrapper = Utils.mediaInfoToBundle(mediaInfo);
-        Intent contentIntent = new Intent();
-        contentIntent.putExtra(VideoCastManager.EXTRA_MEDIA, mediaWrapper);
-        PendingIntent sentPI = PendingIntent.getBroadcast(this, NOTIFICATION_ID, contentIntent, PendingIntent.FLAG_CANCEL_CURRENT);
-
-        return sentPI;
-    }
-
 
     /*
      * Reads application ID and target activity from preference storage.
      */
     private void readPersistedData() {
         mTargetActivity = mCastManager.getCastConfiguration().getTargetActivity();
-        mTargetAction = mCastManager.getCastConfiguration().getTargetAction();
         if (mTargetActivity == null) {
             mTargetActivity = VideoCastManager.DEFAULT_TARGET_ACTIVITY;
         }

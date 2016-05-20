@@ -348,6 +348,7 @@ public class VideoCastNotificationService extends Service {
                         .setMediaSession(mCastManager.getMediaSessionCompatToken()))
                 .setOngoing(true)
                 .setShowWhen(false)
+                .setWhen(0)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
 
         for (Integer notificationType : mNotificationActions) {

@@ -238,8 +238,7 @@ public class VideoCastNotificationService extends Service {
             @Override
             protected void onPostExecute(Bitmap bitmap) {
                 try {
-                    //TODO maybe replace this
-                    mVideoArtBitmap = Utils.scaleAndCenterCropBitmap(bitmap, mDimensionInPixels,
+                    mVideoArtBitmap = Utils.scaleBitmap(bitmap, mDimensionInPixels,
                             mDimensionInPixels);
                     build(info, mVideoArtBitmap, mIsPlaying);
                 } catch (CastException | NoConnectionException

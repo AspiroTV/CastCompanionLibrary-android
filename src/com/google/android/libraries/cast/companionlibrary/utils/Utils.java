@@ -32,6 +32,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Matrix;
 import android.graphics.Point;
 import android.graphics.RectF;
 import android.net.Uri;
@@ -352,6 +353,35 @@ public final class Utils {
         float xScale = (float) newWidth / sourceWidth;
         float yScale = (float) newHeight / sourceHeight;
         float scale = Math.max(xScale, yScale);
+
+        float scaledWidth = scale * sourceWidth;
+        float scaledHeight = scale * sourceHeight;
+
+        float left = (newWidth - scaledWidth) / 2;
+        float top = (newHeight - scaledHeight) / 2;
+
+        RectF targetRect = new RectF(left, top, left + scaledWidth, top + scaledHeight);
+
+        Bitmap destination = Bitmap.createBitmap(newWidth, newHeight, source.getConfig());
+        Canvas canvas = new Canvas(destination);
+        canvas.drawBitmap(source, null, targetRect, null);
+
+        return destination;
+    }
+
+    /**
+     * Scale and center a bitmap to fit the given dimensions.
+     */
+    public static Bitmap scaleBitmap(Bitmap source, int newHeight, int newWidth) {
+        if (source == null) {
+            return null;
+        }
+        int sourceWidth = source.getWidth();
+        int sourceHeight = source.getHeight();
+
+        float xScale = (float) newWidth / sourceWidth;
+        float yScale = (float) newHeight / sourceHeight;
+        float scale = Math.min(xScale, yScale);
 
         float scaledWidth = scale * sourceWidth;
         float scaledHeight = scale * sourceHeight;

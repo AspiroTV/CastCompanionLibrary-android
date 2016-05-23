@@ -18,6 +18,7 @@ package com.google.android.libraries.cast.companionlibrary.cast;
 
 import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGD;
 import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGE;
+import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGI;
 
 import com.google.android.gms.cast.ApplicationMetadata;
 import com.google.android.gms.cast.Cast;
@@ -72,6 +73,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Point;
 import android.media.AudioManager;
 import android.net.Uri;
+import android.nfc.Tag;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceScreen;
@@ -2224,6 +2226,7 @@ public class VideoCastManager extends BaseCastManager
                 public boolean onMediaButtonEvent(Intent mediaButtonIntent) {
                     KeyEvent keyEvent = mediaButtonIntent
                             .getParcelableExtra(Intent.EXTRA_KEY_EVENT);
+                    LOGI(TAG, "MediaSessionCompat.Callback() callback keyEvent:" + keyEvent);
                     if (keyEvent != null && (keyEvent.getKeyCode() == KeyEvent.KEYCODE_MEDIA_PAUSE
                             || keyEvent.getKeyCode() == KeyEvent.KEYCODE_MEDIA_PLAY)) {
                         toggle();
@@ -2233,16 +2236,19 @@ public class VideoCastManager extends BaseCastManager
 
                 @Override
                 public void onPlay() {
+                    LOGI(TAG, "MediaSessionCompat.Callback() onPlay()");
                     toggle();
                 }
 
                 @Override
                 public void onPause() {
+                    LOGI(TAG, "MediaSessionCompat.Callback() onPause()");
                     toggle();
                 }
 
                 private void toggle() {
                     try {
+                        LOGI(TAG, "MediaSessionCompat.Callback() toggle()");
                         togglePlayback();
                     } catch (CastException | TransientNetworkDisconnectionException |
                         NoConnectionException e) {
@@ -2321,8 +2327,7 @@ public class VideoCastManager extends BaseCastManager
      * full-screen image so we need to separately handle these two cases.
      */
     private void setBitmapForLockScreen(MediaInfo video) {
-        //TODO HACK
-        if (video == null || mMediaSessionCompat == null || true) {
+        if (video == null || mMediaSessionCompat == null || !mContext.getResources().getBoolean(R.bool.tablet)) {
             return;
         }
         Uri imgUrl = null;

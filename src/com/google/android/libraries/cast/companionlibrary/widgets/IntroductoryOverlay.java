@@ -191,7 +191,7 @@ public class IntroductoryOverlay extends RelativeLayout {
 
         if (mButton != null) {
             mButton.setText(buttonText);
-            mButton.getBackground().setColorFilter(buttonColor, PorterDuff.Mode.MULTIPLY);
+//            mButton.getBackground().setColorFilter(buttonColor, PorterDuff.Mode.MULTIPLY);
             mButton.setOnClickListener(new OnClickListener() {
                 @Override
                 public void onClick(View view) {

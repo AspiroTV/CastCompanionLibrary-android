@@ -71,46 +71,51 @@ public class ReconnectionService extends Service {
 
     @Override
     public void onCreate() {
-        LOGD(TAG, "onCreate() is called");
-        mCastManager = VideoCastManager.getInstance();
-        if (!mCastManager.isConnected() && !mCastManager.isConnecting()) {
-            mCastManager.reconnectSessionIfPossible();
+        try {
+            mCastManager = VideoCastManager.getInstance();
+        } catch (Exception e) {
         }
+        LOGD(TAG, "onCreate() is called mCastManager:" + mCastManager);
+        if (mCastManager != null) {
 
-        // register a broadcast receiver to be notified when screen goes on or off
-        IntentFilter screenOnOffIntentFilter = new IntentFilter(Intent.ACTION_SCREEN_ON);
-        screenOnOffIntentFilter.addAction(Intent.ACTION_SCREEN_OFF);
-        mScreenOnOffBroadcastReceiver = new BroadcastReceiver() {
-
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                LOGD(TAG, "ScreenOnOffBroadcastReceiver: onReceive(): " + intent.getAction());
-                long timeLeft = getMediaRemainingTime();
-                if (timeLeft < EPSILON_MS) {
-                    handleTermination();
-                }
+            if (!mCastManager.isConnected() && !mCastManager.isConnecting()) {
+                mCastManager.reconnectSessionIfPossible();
             }
-        };
-        registerReceiver(mScreenOnOffBroadcastReceiver, screenOnOffIntentFilter);
 
-        // register a wifi receiver that would be notified when the network state changes
-        IntentFilter networkIntentFilter = new IntentFilter();
-        networkIntentFilter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
-        mWifiBroadcastReceiver = new BroadcastReceiver() {
+            // register a broadcast receiver to be notified when screen goes on or off
+            IntentFilter screenOnOffIntentFilter = new IntentFilter(Intent.ACTION_SCREEN_ON);
+            screenOnOffIntentFilter.addAction(Intent.ACTION_SCREEN_OFF);
+            mScreenOnOffBroadcastReceiver = new BroadcastReceiver() {
 
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                final String action = intent.getAction();
-                if (action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)) {
-                    NetworkInfo info = intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
-                    boolean connected = info.isConnected();
-                    String networkSsid = connected ? Utils.getWifiSsid(context) : null;
-                    ReconnectionService.this.onWifiConnectivityChanged(connected, networkSsid);
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    LOGD(TAG, "ScreenOnOffBroadcastReceiver: onReceive(): " + intent.getAction());
+                    long timeLeft = getMediaRemainingTime();
+                    if (timeLeft < EPSILON_MS) {
+                        handleTermination();
+                    }
                 }
-            }
-        };
-        registerReceiver(mWifiBroadcastReceiver, networkIntentFilter);
+            };
+            registerReceiver(mScreenOnOffBroadcastReceiver, screenOnOffIntentFilter);
 
+            // register a wifi receiver that would be notified when the network state changes
+            IntentFilter networkIntentFilter = new IntentFilter();
+            networkIntentFilter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
+            mWifiBroadcastReceiver = new BroadcastReceiver() {
+
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    final String action = intent.getAction();
+                    if (action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)) {
+                        NetworkInfo info = intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
+                        boolean connected = info.isConnected();
+                        String networkSsid = connected ? Utils.getWifiSsid(context) : null;
+                        ReconnectionService.this.onWifiConnectivityChanged(connected, networkSsid);
+                    }
+                }
+            };
+            registerReceiver(mWifiBroadcastReceiver, networkIntentFilter);
+        }
         super.onCreate();
     }
 
@@ -120,6 +125,9 @@ public class ReconnectionService extends Service {
      */
     public void onWifiConnectivityChanged(boolean connected, final String networkSsid) {
         LOGD(TAG, "WIFI connectivity changed to " + (connected ? "enabled" : "disabled"));
+        if (mCastManager == null) {
+            return;
+        }
         if (connected && !mWifiConnectivity) {
             mWifiConnectivity = true;
             if (mCastManager.isFeatureEnabled(CastConfiguration.FEATURE_WIFI_RECONNECT)) {
@@ -188,12 +196,18 @@ public class ReconnectionService extends Service {
     }
 
     private long getMediaRemainingTime() {
-        long endTime = mCastManager.getPreferenceAccessor().getLongFromPreference(
-                BaseCastManager.PREFS_KEY_MEDIA_END, 0);
-        return endTime - SystemClock.elapsedRealtime();
+        if (mCastManager != null) {
+            long endTime = mCastManager.getPreferenceAccessor().getLongFromPreference(
+                    BaseCastManager.PREFS_KEY_MEDIA_END, 0);
+            return endTime - SystemClock.elapsedRealtime();
+        }
+        return 0;
     }
 
     private void handleTermination() {
+        if (mCastManager == null) {
+            return;
+        }
         if (!mCastManager.isConnected()) {
             mCastManager.clearMediaSession();
             mCastManager.clearPersistedConnectionInfo(BaseCastManager.CLEAR_ALL);

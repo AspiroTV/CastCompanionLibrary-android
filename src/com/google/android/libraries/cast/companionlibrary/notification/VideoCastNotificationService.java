@@ -104,82 +104,88 @@ public class VideoCastNotificationService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        mDimensionInPixels = Utils.convertDpToPixel(VideoCastNotificationService.this,
-                getResources().getDimension(R.dimen.ccl_notification_image_size));
-        mCastManager = VideoCastManager.getInstance();
-        readPersistedData();
-        if (!mCastManager.isConnected() && !mCastManager.isConnecting()) {
-            mCastManager.reconnectSessionIfPossible();
+        try {
+            mCastManager = VideoCastManager.getInstance();
+        } catch (Exception e) {
         }
-        MediaQueue mediaQueue = mCastManager.getMediaQueue();
-        if (mediaQueue != null) {
-            int position = mediaQueue.getCurrentItemPosition();
-            int size = mediaQueue.getCount();
-            mHasNext = position < (size - 1);
-            mHasPrev = position > 0;
-        }
-        mConsumer = new VideoCastConsumerImpl() {
-            @Override
-            public void onApplicationDisconnected(int errorCode) {
-                LOGD(TAG, "onApplicationDisconnected() was reached, stopping the notification"
-                        + " service");
-                stopSelf();
+        LOGD(TAG, "onCreate mCastManager:" + mCastManager);
+        if (mCastManager != null) {
+            mDimensionInPixels = Utils.convertDpToPixel(VideoCastNotificationService.this,
+                    getResources().getDimension(R.dimen.ccl_notification_image_size));
+            readPersistedData();
+            if (!mCastManager.isConnected() && !mCastManager.isConnecting()) {
+                mCastManager.reconnectSessionIfPossible();
             }
-
-            @Override
-            public void onDisconnected() {
-                stopSelf();
-            }
-
-            @Override
-            public void onRemoteMediaPlayerStatusUpdated() {
-                int mediaStatus = mCastManager.getPlaybackStatus();
-                VideoCastNotificationService.this.onRemoteMediaPlayerStatusUpdated(mediaStatus);
-            }
-
-            @Override
-            public void onUiVisibilityChanged(boolean visible) {
-                mVisible = !visible;
-
-                if (mNotification == null) {
-                    try {
-                        setUpNotification(mCastManager.getRemoteMediaInformation());
-                    } catch (TransientNetworkDisconnectionException | NoConnectionException e) {
-                        LOGE(TAG, "onStartCommand() failed to get media", e);
-                    }
-                }
-                if (mVisible && (mNotification != null)) {
-                    startForeground(NOTIFICATION_ID, mNotification);
-                } else {
-                    stopForeground(true);
-                }
-            }
-
-            @Override
-            public void onMediaQueueUpdated(List<MediaQueueItem> queueItems, MediaQueueItem item,
-                    int repeatMode, boolean shuffle) {
-                int size = 0;
-                int position = 0;
-                if (queueItems != null) {
-                    size = queueItems.size();
-                    position = queueItems.indexOf(item);
-                }
+            MediaQueue mediaQueue = mCastManager.getMediaQueue();
+            if (mediaQueue != null) {
+                int position = mediaQueue.getCurrentItemPosition();
+                int size = mediaQueue.getCount();
                 mHasNext = position < (size - 1);
                 mHasPrev = position > 0;
             }
-        };
-        mCastManager.addVideoCastConsumer(mConsumer);
-        mNotificationActions = mCastManager.getCastConfiguration().getNotificationActions();
-        List<Integer> notificationCompactActions = mCastManager.getCastConfiguration()
-                .getNotificationCompactActions();
-        if (notificationCompactActions != null) {
-            mNotificationCompactActionsArray = new int[notificationCompactActions.size()];
-            for (int i = 0; i < notificationCompactActions.size(); i++) {
-                mNotificationCompactActionsArray[i] = notificationCompactActions.get(i);
+            mConsumer = new VideoCastConsumerImpl() {
+                @Override
+                public void onApplicationDisconnected(int errorCode) {
+                    LOGD(TAG, "onApplicationDisconnected() was reached, stopping the notification"
+                            + " service");
+                    stopSelf();
+                }
+
+                @Override
+                public void onDisconnected() {
+                    stopSelf();
+                }
+
+                @Override
+                public void onRemoteMediaPlayerStatusUpdated() {
+                    int mediaStatus = mCastManager.getPlaybackStatus();
+                    VideoCastNotificationService.this.onRemoteMediaPlayerStatusUpdated(mediaStatus);
+                }
+
+                @Override
+                public void onUiVisibilityChanged(boolean visible) {
+                    mVisible = !visible;
+
+                    if (mNotification == null) {
+                        try {
+                            setUpNotification(mCastManager.getRemoteMediaInformation());
+                        } catch (TransientNetworkDisconnectionException | NoConnectionException e) {
+                            LOGE(TAG, "onStartCommand() failed to get media", e);
+                        }
+                    }
+                    if (mVisible && (mNotification != null)) {
+                        startForeground(NOTIFICATION_ID, mNotification);
+                    } else {
+                        stopForeground(true);
+                    }
+                }
+
+                @Override
+                public void onMediaQueueUpdated(List<MediaQueueItem> queueItems, MediaQueueItem item,
+                                                int repeatMode, boolean shuffle) {
+                    int size = 0;
+                    int position = 0;
+                    if (queueItems != null) {
+                        size = queueItems.size();
+                        position = queueItems.indexOf(item);
+                    }
+                    mHasNext = position < (size - 1);
+                    mHasPrev = position > 0;
+                }
+            };
+            mCastManager.addVideoCastConsumer(mConsumer);
+            mNotificationActions = mCastManager.getCastConfiguration().getNotificationActions();
+            List<Integer> notificationCompactActions = mCastManager.getCastConfiguration()
+                    .getNotificationCompactActions();
+            if (notificationCompactActions != null) {
+                mNotificationCompactActionsArray = new int[notificationCompactActions.size()];
+                for (int i = 0; i < notificationCompactActions.size(); i++) {
+                    mNotificationCompactActionsArray[i] = notificationCompactActions.get(i);
+                }
             }
+            mForwardTimeInMillis = TimeUnit.SECONDS
+                    .toMillis(mCastManager.getCastConfiguration().getForwardStep());
         }
-        mForwardTimeInMillis = TimeUnit.SECONDS
-                .toMillis(mCastManager.getCastConfiguration().getForwardStep());
     }
 
     @Override

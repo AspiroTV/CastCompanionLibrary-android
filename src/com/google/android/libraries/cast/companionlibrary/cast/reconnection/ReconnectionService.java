@@ -71,52 +71,8 @@ public class ReconnectionService extends Service {
 
     @Override
     public void onCreate() {
-        try {
-            mCastManager = VideoCastManager.getInstance();
-        } catch (Exception e) {
-        }
-        LOGD(TAG, "onCreate() is called mCastManager:" + mCastManager);
-        if (mCastManager != null) {
-
-            if (!mCastManager.isConnected() && !mCastManager.isConnecting()) {
-                mCastManager.reconnectSessionIfPossible();
-            }
-
-            // register a broadcast receiver to be notified when screen goes on or off
-            IntentFilter screenOnOffIntentFilter = new IntentFilter(Intent.ACTION_SCREEN_ON);
-            screenOnOffIntentFilter.addAction(Intent.ACTION_SCREEN_OFF);
-            mScreenOnOffBroadcastReceiver = new BroadcastReceiver() {
-
-                @Override
-                public void onReceive(Context context, Intent intent) {
-                    LOGD(TAG, "ScreenOnOffBroadcastReceiver: onReceive(): " + intent.getAction());
-                    long timeLeft = getMediaRemainingTime();
-                    if (timeLeft < EPSILON_MS) {
-                        handleTermination();
-                    }
-                }
-            };
-            registerReceiver(mScreenOnOffBroadcastReceiver, screenOnOffIntentFilter);
-
-            // register a wifi receiver that would be notified when the network state changes
-            IntentFilter networkIntentFilter = new IntentFilter();
-            networkIntentFilter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
-            mWifiBroadcastReceiver = new BroadcastReceiver() {
-
-                @Override
-                public void onReceive(Context context, Intent intent) {
-                    final String action = intent.getAction();
-                    if (action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)) {
-                        NetworkInfo info = intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
-                        boolean connected = info.isConnected();
-                        String networkSsid = connected ? Utils.getWifiSsid(context) : null;
-                        ReconnectionService.this.onWifiConnectivityChanged(connected, networkSsid);
-                    }
-                }
-            };
-            registerReceiver(mWifiBroadcastReceiver, networkIntentFilter);
-        }
         super.onCreate();
+        initializeManager();
     }
 
     /**
@@ -125,7 +81,7 @@ public class ReconnectionService extends Service {
      */
     public void onWifiConnectivityChanged(boolean connected, final String networkSsid) {
         LOGD(TAG, "WIFI connectivity changed to " + (connected ? "enabled" : "disabled"));
-        if (mCastManager == null) {
+        if (!initializeManager()) {
             return;
         }
         if (connected && !mWifiConnectivity) {
@@ -196,7 +152,7 @@ public class ReconnectionService extends Service {
     }
 
     private long getMediaRemainingTime() {
-        if (mCastManager != null) {
+        if (initializeManager()) {
             long endTime = mCastManager.getPreferenceAccessor().getLongFromPreference(
                     BaseCastManager.PREFS_KEY_MEDIA_END, 0);
             return endTime - SystemClock.elapsedRealtime();
@@ -205,7 +161,7 @@ public class ReconnectionService extends Service {
     }
 
     private void handleTermination() {
-        if (mCastManager == null) {
+        if (!initializeManager()) {
             return;
         }
         if (!mCastManager.isConnected()) {
@@ -237,6 +193,57 @@ public class ReconnectionService extends Service {
             }
 
         }
+    }
+
+    private boolean initializeManager() {
+        if (mCastManager == null) {
+            try {
+                mCastManager = VideoCastManager.getInstance();
+            } catch (Exception e) {
+            }
+            LOGD(TAG, "onCreate() is called mCastManager:" + mCastManager);
+            if (mCastManager != null) {
+
+                if (!mCastManager.isConnected() && !mCastManager.isConnecting()) {
+                    mCastManager.reconnectSessionIfPossible();
+                }
+
+                // register a broadcast receiver to be notified when screen goes on or off
+                IntentFilter screenOnOffIntentFilter = new IntentFilter(Intent.ACTION_SCREEN_ON);
+                screenOnOffIntentFilter.addAction(Intent.ACTION_SCREEN_OFF);
+                mScreenOnOffBroadcastReceiver = new BroadcastReceiver() {
+
+                    @Override
+                    public void onReceive(Context context, Intent intent) {
+                        LOGD(TAG, "ScreenOnOffBroadcastReceiver: onReceive(): " + intent.getAction());
+                        long timeLeft = getMediaRemainingTime();
+                        if (timeLeft < EPSILON_MS) {
+                            handleTermination();
+                        }
+                    }
+                };
+                registerReceiver(mScreenOnOffBroadcastReceiver, screenOnOffIntentFilter);
+
+                // register a wifi receiver that would be notified when the network state changes
+                IntentFilter networkIntentFilter = new IntentFilter();
+                networkIntentFilter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
+                mWifiBroadcastReceiver = new BroadcastReceiver() {
+
+                    @Override
+                    public void onReceive(Context context, Intent intent) {
+                        final String action = intent.getAction();
+                        if (action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)) {
+                            NetworkInfo info = intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
+                            boolean connected = info.isConnected();
+                            String networkSsid = connected ? Utils.getWifiSsid(context) : null;
+                            ReconnectionService.this.onWifiConnectivityChanged(connected, networkSsid);
+                        }
+                    }
+                };
+                registerReceiver(mWifiBroadcastReceiver, networkIntentFilter);
+            }
+        }
+        return (mCastManager != null);
     }
 }
 

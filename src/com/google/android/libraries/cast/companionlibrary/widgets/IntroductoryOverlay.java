@@ -96,6 +96,7 @@ public class IntroductoryOverlay extends RelativeLayout {
     private static final String ALPHA_PROPERTY = "alpha";
     private static final float INVISIBLE_VALUE = 0f;
     private OnOverlayDismissedListener mListener;
+    private View mCastView;
 
     private IntroductoryOverlay(Builder builder) {
         this(builder, null, R.styleable.CustomTheme_CCLIntroOverlayStyle);
@@ -133,9 +134,9 @@ public class IntroductoryOverlay extends RelativeLayout {
             mFocusRadius = typedArray
                     .getDimension(R.styleable.CCLIntroOverlay_ccl_IntroFocusRadius, 0);
         }
-        View view = builder.mView;
+        mCastView = builder.mView;
         Rect rect = new Rect();
-        view.getGlobalVisibleRect(rect);
+        mCastView.getGlobalVisibleRect(rect);
         mCenterX = rect.centerX();
         mCenterY = rect.centerY();
         setFitsSystemWindows(true);
@@ -180,6 +181,15 @@ public class IntroductoryOverlay extends RelativeLayout {
         mListener = null;
     }
 
+    public void update() {
+        if (mCastView != null) {
+            Rect rect = new Rect();
+            mCastView.getGlobalVisibleRect(rect);
+            mCenterX = rect.centerX();
+            mCenterY = rect.centerY();
+        }
+    }
+
     private void setButton(String text, TypedArray typedArray) {
         String buttonText = text;
         if (TextUtils.isEmpty(text)) {
@@ -219,6 +229,12 @@ public class IntroductoryOverlay extends RelativeLayout {
         mHolePaint.setAlpha(0);
         mHolePaint.setXfermode(xfermode);
         mHolePaint.setAntiAlias(true);
+    }
+
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        update();
     }
 
     @Override

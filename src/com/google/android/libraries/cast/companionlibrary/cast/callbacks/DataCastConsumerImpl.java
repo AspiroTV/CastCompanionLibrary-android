@@ -16,9 +16,10 @@
 
 package com.google.android.libraries.cast.companionlibrary.cast.callbacks;
 
-import com.google.android.gms.cast.ApplicationMetadata;
 import com.google.android.gms.cast.CastDevice;
 import com.google.android.gms.common.api.Status;
+
+import com.noriginmedia.cast.wrap.ApplicationMetadata;
 
 /**
  * A no-op implementation of the {@link DataCastConsumer}
@@ -27,7 +28,7 @@ public class DataCastConsumerImpl extends BaseCastConsumerImpl implements DataCa
 
     @Override
     public void onApplicationConnected(ApplicationMetadata appMetadata, String applicationStatus,
-            String sessionId, boolean wasLaunched) {
+                                       String sessionId, boolean wasLaunched) {
     }
 
     @Override

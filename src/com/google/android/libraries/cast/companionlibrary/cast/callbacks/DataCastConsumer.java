@@ -16,9 +16,10 @@
 
 package com.google.android.libraries.cast.companionlibrary.cast.callbacks;
 
-import com.google.android.gms.cast.ApplicationMetadata;
 import com.google.android.gms.cast.CastDevice;
 import com.google.android.gms.common.api.Status;
+
+import com.noriginmedia.cast.wrap.ApplicationMetadata;
 
 /**
  * An interface that extends {@link BaseCastConsumer} and adds callbacks for application lifecycle

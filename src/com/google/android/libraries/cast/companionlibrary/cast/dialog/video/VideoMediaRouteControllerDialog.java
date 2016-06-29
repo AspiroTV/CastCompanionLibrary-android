@@ -18,7 +18,7 @@ package com.google.android.libraries.cast.companionlibrary.cast.dialog.video;
 
 import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGE;
 
-import com.google.android.gms.cast.MediaInfo;
+
 import com.google.android.gms.cast.MediaMetadata;
 import com.google.android.gms.cast.MediaStatus;
 import com.google.android.libraries.cast.companionlibrary.R;
@@ -29,6 +29,8 @@ import com.google.android.libraries.cast.companionlibrary.cast.exceptions.NoConn
 import com.google.android.libraries.cast.companionlibrary.cast.exceptions.TransientNetworkDisconnectionException;
 import com.google.android.libraries.cast.companionlibrary.utils.FetchBitmapTask;
 import com.google.android.libraries.cast.companionlibrary.utils.LogUtils;
+
+import com.noriginmedia.cast.wrap.MediaInfo;
 
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -159,7 +161,7 @@ public class VideoMediaRouteControllerDialog extends MediaRouteControllerDialog 
         }
         mStreamType = info.getStreamType();
         hideControls(false, 0);
-        MediaMetadata mm = info.getMetadata();
+        MediaMetadata mm = info.getMediaInfo().getMetadata();
         mTitle.setText(mm.getString(MediaMetadata.KEY_TITLE));
         mSubTitle.setText(mm.getString(MediaMetadata.KEY_SUBTITLE));
         setIcon(mm.hasImages() ? mm.getImages().get(0).getUrl() : null);

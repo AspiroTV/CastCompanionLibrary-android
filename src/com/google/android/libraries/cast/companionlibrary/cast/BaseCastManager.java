@@ -19,7 +19,6 @@ package com.google.android.libraries.cast.companionlibrary.cast;
 import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGD;
 import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGE;
 
-import com.google.android.gms.cast.ApplicationMetadata;
 import com.google.android.gms.cast.Cast;
 import com.google.android.gms.cast.Cast.ApplicationConnectionResult;
 import com.google.android.gms.cast.CastDevice;
@@ -43,6 +42,8 @@ import com.google.android.libraries.cast.companionlibrary.utils.LogUtils;
 import com.google.android.libraries.cast.companionlibrary.utils.PreferenceAccessor;
 import com.google.android.libraries.cast.companionlibrary.utils.Utils;
 
+import com.noriginmedia.cast.wrap.ApplicationMetadata;
+
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.PendingIntent;
@@ -64,6 +65,7 @@ import android.support.v7.media.MediaRouter;
 import android.support.v7.media.MediaRouter.RouteInfo;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 
 import java.io.IOException;
 import java.lang.annotation.Retention;
@@ -418,7 +420,8 @@ public abstract class BaseCastManager
      * </li>
      * </ul>
      */
-    public final void addMediaRouterButton(MediaRouteButton button) {
+    public final void addMediaRouterButton(View view) {
+        MediaRouteButton button = (MediaRouteButton)view;
         button.setRouteSelector(mMediaRouteSelector);
         if (getMediaRouteDialogFactory() != null) {
             button.setDialogFactory(getMediaRouteDialogFactory());
@@ -1017,7 +1020,7 @@ public abstract class BaseCastManager
                         public void onResult(ApplicationConnectionResult result) {
                             if (result.getStatus().isSuccess()) {
                                 LOGD(TAG, "joinApplication() -> success");
-                                onApplicationConnected(result.getApplicationMetadata(),
+                                onApplicationConnected(new ApplicationMetadata(result.getApplicationMetadata()),
                                         result.getApplicationStatus(), result.getSessionId(),
                                         result.getWasLaunched());
                             } else {
@@ -1039,7 +1042,7 @@ public abstract class BaseCastManager
                                 public void onResult(ApplicationConnectionResult result) {
                                     if (result.getStatus().isSuccess()) {
                                         LOGD(TAG, "launchApplication() -> success result");
-                                        onApplicationConnected(result.getApplicationMetadata(),
+                                        onApplicationConnected(new ApplicationMetadata(result.getApplicationMetadata()),
                                                 result.getApplicationStatus(),
                                                 result.getSessionId(),
                                                 result.getWasLaunched());

@@ -284,7 +284,7 @@ public class VideoCastControllerActivity extends AppCompatActivity implements
 
         // Create and show the dialog.
         TracksChooserDialog dialogFragment = TracksChooserDialog
-                .newInstance(mCastManager.getRemoteMediaInformation());
+                .newInstance(mCastManager.getRemoteMediaInformation() != null ? mCastManager.getRemoteMediaInformation().getMediaInfo() : null);
         dialogFragment.show(transaction, DIALOG_TAG);
     }
 

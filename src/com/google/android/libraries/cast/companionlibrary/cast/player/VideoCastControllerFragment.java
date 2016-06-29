@@ -20,7 +20,6 @@ import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.
 import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGE;
 
 import com.google.android.gms.cast.CastStatusCodes;
-import com.google.android.gms.cast.MediaInfo;
 import com.google.android.gms.cast.MediaMetadata;
 import com.google.android.gms.cast.MediaQueueItem;
 import com.google.android.gms.cast.MediaStatus;
@@ -37,6 +36,8 @@ import com.google.android.libraries.cast.companionlibrary.cast.exceptions.Transi
 import com.google.android.libraries.cast.companionlibrary.utils.FetchBitmapTask;
 import com.google.android.libraries.cast.companionlibrary.utils.LogUtils;
 import com.google.android.libraries.cast.companionlibrary.utils.Utils;
+
+import com.noriginmedia.cast.wrap.MediaInfo;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -153,7 +154,8 @@ public class VideoCastControllerFragment extends Fragment implements
                             + customDataStr, e);
                 }
             }
-            MediaInfo info = Utils.bundleToMediaInfo(mediaWrapper);
+            com.google.android.gms.cast.MediaInfo i = Utils.bundleToMediaInfo(mediaWrapper);
+            MediaInfo info =  (i != null ? new MediaInfo(i) : null);
             int startPoint = extras.getInt(VideoCastManager.EXTRA_START_POINT, 0);
             onReady(info, shouldStartPlayback && explicitStartActivity, startPoint, customData);
         }
@@ -377,7 +379,7 @@ public class VideoCastControllerFragment extends Fragment implements
         if (mCastManager.isFeatureEnabled(CastConfiguration.FEATURE_CAPTIONS_PREFERENCE)
                 && mSelectedMedia != null
                 && mCastManager.getTracksPreferenceManager().isCaptionEnabled()) {
-            List<MediaTrack> tracks = mSelectedMedia.getMediaTracks();
+            List<MediaTrack> tracks = mSelectedMedia.getMediaInfo().getMediaTracks();
             state = Utils.hasAudioOrTextTrack(tracks) ? VideoCastController.CC_ENABLED
                     : VideoCastController.CC_DISABLED;
         }
@@ -424,13 +426,13 @@ public class VideoCastControllerFragment extends Fragment implements
                 imageUrl = Utils.getImageUri(mMediaAuthService.getMediaInfo(), 1);
             }
         } else {
-            imageUrl = Utils.getImageUri(mSelectedMedia, 1);
+            imageUrl = Utils.getImageUri(mSelectedMedia.getMediaInfo(), 1);
         }
         showImage(imageUrl);
         if (mSelectedMedia == null) {
             return;
         }
-        MediaMetadata mm = mSelectedMedia.getMetadata();
+        MediaMetadata mm = mSelectedMedia.getMediaInfo().getMetadata();
         mCastController.setTitle(mm.getString(MediaMetadata.KEY_TITLE) != null
                 ? mm.getString(MediaMetadata.KEY_TITLE) : "");
         boolean isLive = mSelectedMedia.getStreamType() == MediaInfo.STREAM_TYPE_LIVE;
@@ -439,7 +441,7 @@ public class VideoCastControllerFragment extends Fragment implements
 
     private void updatePlayerStatus() {
         int mediaStatus = mCastManager.getPlaybackStatus();
-        mMediaStatus = mCastManager.getMediaStatus();
+        mMediaStatus = mCastManager.getMediaStatus().getMediaStatus();
         LOGD(TAG, "updatePlayerStatus(), state: " + mediaStatus);
         if (mSelectedMedia == null) {
             return;
@@ -538,7 +540,7 @@ public class VideoCastControllerFragment extends Fragment implements
                     return;
                 }
             }
-            mMediaStatus = mCastManager.getMediaStatus();
+            mMediaStatus = mCastManager.getMediaStatus().getMediaStatus();
             mCastManager.addVideoCastConsumer(mCastConsumer);
             if (!mIsFresh) {
                 updatePlayerStatus();
@@ -749,7 +751,7 @@ public class VideoCastControllerFragment extends Fragment implements
     }
 
     @Override
-    public void onAuthResult(MediaAuthStatus status, final MediaInfo info, final String message,
+    public void onAuthResult(MediaAuthStatus status, final com.google.android.gms.cast.MediaInfo info, final String message,
             final int startPoint, final JSONObject customData) {
         if (status == MediaAuthStatus.AUTHORIZED && mAuthSuccess) {
             // successful authorization
@@ -757,14 +759,14 @@ public class VideoCastControllerFragment extends Fragment implements
             if (mMediaAuthTimer != null) {
                 mMediaAuthTimer.cancel();
             }
-            mSelectedMedia = info;
+            mSelectedMedia = (info != null ? new MediaInfo(info) : null);
             updateClosedCaptionState();
             mHandler.post(new Runnable() {
 
                 @Override
                 public void run() {
                     mOverallState = OverallState.PLAYBACK;
-                    onReady(info, true, startPoint, customData);
+                    onReady(mSelectedMedia, true, startPoint, customData);
                 }
             });
         } else {

@@ -19,7 +19,6 @@ package com.google.android.libraries.cast.companionlibrary.cast;
 import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGD;
 import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGE;
 
-import com.google.android.gms.cast.ApplicationMetadata;
 import com.google.android.gms.cast.Cast;
 import com.google.android.gms.cast.Cast.CastOptions.Builder;
 import com.google.android.gms.cast.CastDevice;
@@ -34,6 +33,8 @@ import com.google.android.libraries.cast.companionlibrary.cast.exceptions.CastEx
 import com.google.android.libraries.cast.companionlibrary.cast.exceptions.NoConnectionException;
 import com.google.android.libraries.cast.companionlibrary.cast.exceptions.TransientNetworkDisconnectionException;
 import com.google.android.libraries.cast.companionlibrary.utils.LogUtils;
+
+import com.noriginmedia.cast.wrap.ApplicationMetadata;
 
 import android.content.Context;
 import android.support.v7.media.MediaRouter.RouteInfo;
@@ -250,7 +251,7 @@ public class DataCastManager extends BaseCastManager implements Cast.MessageRece
 
     @Override
     public void onApplicationConnected(ApplicationMetadata appMetadata, String applicationStatus,
-            String sessionId, boolean wasLaunched) {
+                                       String sessionId, boolean wasLaunched) {
         LOGD(TAG, "onApplicationConnected() reached with sessionId: " + sessionId);
 
         // saving session for future retrieval; we only save the last session info

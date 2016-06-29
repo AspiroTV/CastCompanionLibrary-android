@@ -20,16 +20,13 @@ import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.
 import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGE;
 import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGI;
 
-import com.google.android.gms.cast.ApplicationMetadata;
 import com.google.android.gms.cast.Cast;
 import com.google.android.gms.cast.Cast.CastOptions.Builder;
 import com.google.android.gms.cast.Cast.MessageReceivedCallback;
 import com.google.android.gms.cast.CastDevice;
 import com.google.android.gms.cast.CastStatusCodes;
-import com.google.android.gms.cast.MediaInfo;
 import com.google.android.gms.cast.MediaMetadata;
 import com.google.android.gms.cast.MediaQueueItem;
-import com.google.android.gms.cast.MediaStatus;
 import com.google.android.gms.cast.MediaTrack;
 import com.google.android.gms.cast.RemoteMediaPlayer;
 import com.google.android.gms.cast.RemoteMediaPlayer.MediaChannelResult;
@@ -59,6 +56,10 @@ import com.google.android.libraries.cast.companionlibrary.widgets.IMiniControlle
 import com.google.android.libraries.cast.companionlibrary.widgets.MiniController;
 import com.google.android.libraries.cast.companionlibrary.widgets.MiniController.OnMiniControllerChangedListener;
 import com.google.android.libraries.cast.companionlibrary.widgets.ProgressWatcher;
+
+import com.noriginmedia.cast.wrap.ApplicationMetadata;
+import com.noriginmedia.cast.wrap.MediaInfo;
+import com.noriginmedia.cast.wrap.MediaStatus;
 
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
@@ -283,13 +284,13 @@ public class VideoCastManager extends BaseCastManager
         checkRemoteMediaPlayerAvailable();
         if (mRemoteMediaPlayer.getStreamDuration() > 0 || isRemoteStreamLive()) {
             MediaInfo mediaInfo = getRemoteMediaInformation();
-            MediaMetadata mm = mediaInfo.getMetadata();
+            MediaMetadata mm = mediaInfo.getMediaInfo().getMetadata();
             controller.setStreamType(mediaInfo.getStreamType());
             controller.setPlaybackStatus(mState, mIdleReason);
             controller.setSubtitle(mContext.getResources().getString(R.string.ccl_casting_to_device,
                     mDeviceName));
             controller.setTitle(mm.getString(MediaMetadata.KEY_TITLE));
-            controller.setIcon(Utils.getImageUri(mediaInfo, 0));
+            controller.setIcon(Utils.getImageUri(mediaInfo.getMediaInfo(), 0));
         }
     }
 
@@ -340,7 +341,7 @@ public class VideoCastManager extends BaseCastManager
     public void onTargetActivityInvoked(Context context) throws
             TransientNetworkDisconnectionException, NoConnectionException {
         Intent contentIntent = new Intent(mContext, mTargetActivity);
-        Bundle mediaWrapper = Utils.mediaInfoToBundle(getRemoteMediaInformation());
+        Bundle mediaWrapper = Utils.mediaInfoToBundle(getRemoteMediaInformation().getMediaInfo());
         contentIntent.putExtra(VideoCastManager.EXTRA_MEDIA, mediaWrapper);
         context.startActivity(contentIntent);
     }
@@ -455,7 +456,7 @@ public class VideoCastManager extends BaseCastManager
      */
     public void startVideoCastControllerActivity(Context context,
             MediaInfo mediaInfo, int position, boolean shouldStart) {
-        startVideoCastControllerActivity(context, Utils.mediaInfoToBundle(mediaInfo), position,
+        startVideoCastControllerActivity(context, Utils.mediaInfoToBundle(mediaInfo.getMediaInfo()), position,
                 shouldStart);
     }
 
@@ -514,7 +515,7 @@ public class VideoCastManager extends BaseCastManager
                     return true;
                 } else {
                     // if we have not reached the end of queue, return true otherwise return false
-                    return mMediaStatus != null && (mMediaStatus.getLoadingItemId()
+                    return mMediaStatus != null && (mMediaStatus.getMediaStatus().getLoadingItemId()
                             != MediaQueueItem.INVALID_ITEM_ID);
                 }
             default:
@@ -532,7 +533,7 @@ public class VideoCastManager extends BaseCastManager
             NoConnectionException {
         checkConnectivity();
         MediaInfo info = getRemoteMediaInformation();
-        return (info != null) && (info.getStreamType() == MediaInfo.STREAM_TYPE_LIVE);
+        return (info != null) && (info.getMediaInfo() != null) && (info.getMediaInfo().getStreamType() == com.google.android.gms.cast.MediaInfo.STREAM_TYPE_LIVE);
     }
 
     /*
@@ -565,7 +566,7 @@ public class VideoCastManager extends BaseCastManager
             NoConnectionException {
         checkConnectivity();
         if (mRemoteMediaPlayer != null && mRemoteMediaPlayer.getMediaInfo() != null) {
-            MediaInfo info = mRemoteMediaPlayer.getMediaInfo();
+            com.google.android.gms.cast.MediaInfo info = mRemoteMediaPlayer.getMediaInfo();
             mRemoteMediaPlayer.getMediaStatus().getPlayerState();
             return info.getContentId();
         }
@@ -611,7 +612,7 @@ public class VideoCastManager extends BaseCastManager
     }
 
     /**
-     * Returns the {@link MediaInfo} for the current media
+     * Returns the {@Link MediaInfo} for the current media
      *
      * @throws NoConnectionException If no connectivity to the device exists
      * @throws TransientNetworkDisconnectionException If framework is still trying to recover from
@@ -621,7 +622,7 @@ public class VideoCastManager extends BaseCastManager
             NoConnectionException {
         checkConnectivity();
         checkRemoteMediaPlayerAvailable();
-        return mRemoteMediaPlayer.getMediaInfo();
+        return (mRemoteMediaPlayer.getMediaInfo() != null ? new MediaInfo(mRemoteMediaPlayer.getMediaInfo()) : null);
     }
 
     /**
@@ -1027,7 +1028,7 @@ public class VideoCastManager extends BaseCastManager
             throw new NoConnectionException();
         }
 
-        mRemoteMediaPlayer.load(mApiClient, media, autoPlay, position, activeTracks, customData)
+        mRemoteMediaPlayer.load(mApiClient, media.getMediaInfo(), autoPlay, position, activeTracks, customData)
                 .setResultCallback(new ResultCallback<RemoteMediaPlayer.MediaChannelResult>() {
 
                     @Override
@@ -1055,10 +1056,7 @@ public class VideoCastManager extends BaseCastManager
      *                   <p>
      *                   This value must be less than the length of {@code items}.
      * @param repeatMode The repeat playback mode for the queue. One of
-     *                   {@link MediaStatus#REPEAT_MODE_REPEAT_OFF},
-     *                   {@link MediaStatus#REPEAT_MODE_REPEAT_ALL},
-     *                   {@link MediaStatus#REPEAT_MODE_REPEAT_SINGLE} and
-     *                   {@link MediaStatus#REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE}.
+     *                   {@link MediaStatus#REPEAT_MODE_REPEAT_OFF}
      * @param customData Custom application-specific data to pass along with the request, may be
      *                   {@code null}.
      * @throws TransientNetworkDisconnectionException
@@ -1853,15 +1851,15 @@ public class VideoCastManager extends BaseCastManager
                             LOGD(TAG,
                                     "RemoteMediaPlayer::onQueueStatusUpdated() is "
                                             + "reached");
-                            mMediaStatus = mRemoteMediaPlayer.getMediaStatus();
+                            mMediaStatus = (mRemoteMediaPlayer.getMediaStatus() != null? new MediaStatus(mRemoteMediaPlayer.getMediaStatus()) : null);
                             if (mMediaStatus != null
-                                    && mMediaStatus.getQueueItems() != null) {
-                                List<MediaQueueItem> queueItems = mMediaStatus
+                                    && mMediaStatus.getMediaStatus().getQueueItems() != null) {
+                                List<MediaQueueItem> queueItems = mMediaStatus.getMediaStatus()
                                         .getQueueItems();
-                                int itemId = mMediaStatus.getCurrentItemId();
-                                MediaQueueItem item = mMediaStatus
+                                int itemId = mMediaStatus.getMediaStatus().getCurrentItemId();
+                                MediaQueueItem item = mMediaStatus.getMediaStatus()
                                         .getQueueItemById(itemId);
-                                int repeatMode = mMediaStatus.getQueueRepeatMode();
+                                int repeatMode = mMediaStatus.getMediaStatus().getQueueRepeatMode();
                                 onQueueUpdated(queueItems, item, repeatMode, false);
                             } else {
                                 onQueueUpdated(null, null,
@@ -2059,12 +2057,12 @@ public class VideoCastManager extends BaseCastManager
             LOGD(TAG, "mApiClient or mRemoteMediaPlayer is null, so will not proceed");
             return;
         }
-        mMediaStatus = mRemoteMediaPlayer.getMediaStatus();
-        List<MediaQueueItem> queueItems = mMediaStatus.getQueueItems();
+        mMediaStatus = (mRemoteMediaPlayer.getMediaStatus() != null ? new MediaStatus(mRemoteMediaPlayer.getMediaStatus()) : null);
+        List<MediaQueueItem> queueItems = mMediaStatus.getMediaStatus().getQueueItems();
         if (queueItems != null) {
-            int itemId = mMediaStatus.getCurrentItemId();
-            MediaQueueItem item = mMediaStatus.getQueueItemById(itemId);
-            int repeatMode = mMediaStatus.getQueueRepeatMode();
+            int itemId = mMediaStatus.getMediaStatus().getCurrentItemId();
+            MediaQueueItem item = mMediaStatus.getMediaStatus().getQueueItemById(itemId);
+            int repeatMode = mMediaStatus.getMediaStatus().getQueueRepeatMode();
             onQueueUpdated(queueItems, item, repeatMode, false);
         } else {
             onQueueUpdated(null, null, MediaStatus.REPEAT_MODE_REPEAT_OFF, false);
@@ -2092,7 +2090,7 @@ public class VideoCastManager extends BaseCastManager
                 updateMediaSession(false);
                 switch (mIdleReason) {
                     case MediaStatus.IDLE_REASON_FINISHED:
-                        if (mMediaStatus.getLoadingItemId() == MediaQueueItem.INVALID_ITEM_ID) {
+                        if (mMediaStatus.getMediaStatus().getLoadingItemId() == MediaQueueItem.INVALID_ITEM_ID) {
                             // we have reached the end of queue
                             clearMediaSession();
                             makeUiHidden = true;
@@ -2111,7 +2109,7 @@ public class VideoCastManager extends BaseCastManager
                         makeUiHidden = true;
                         break;
                     case MediaStatus.IDLE_REASON_INTERRUPTED:
-                        if (mMediaStatus.getLoadingItemId() == MediaQueueItem.INVALID_ITEM_ID) {
+                        if (mMediaStatus.getMediaStatus().getLoadingItemId() == MediaQueueItem.INVALID_ITEM_ID) {
                             // we have reached the end of queue
                             clearMediaSession();
                             makeUiHidden = true;
@@ -2145,9 +2143,9 @@ public class VideoCastManager extends BaseCastManager
 
     private void onRemoteMediaPreloadStatusUpdated() {
         MediaQueueItem item = null;
-        mMediaStatus = mRemoteMediaPlayer.getMediaStatus();
+        mMediaStatus = (mRemoteMediaPlayer.getMediaStatus() != null ? new MediaStatus(mRemoteMediaPlayer.getMediaStatus()) : null);
         if (mMediaStatus != null) {
-            item = mMediaStatus.getQueueItemById(mMediaStatus.getPreloadedItemId());
+            item = mMediaStatus.getMediaStatus().getQueueItemById(mMediaStatus.getMediaStatus().getPreloadedItemId());
         }
         mPreLoadingItem = item;
         updateMiniControllersVisibilityForUpcoming(item);
@@ -2300,7 +2298,9 @@ public class VideoCastManager extends BaseCastManager
     private PendingIntent getCastControllerPendingIntent() {
         Bundle mediaWrapper = null;
         try {
-            mediaWrapper = Utils.mediaInfoToBundle(getRemoteMediaInformation());
+            if (getRemoteMediaInformation() != null) {
+                mediaWrapper = Utils.mediaInfoToBundle(getRemoteMediaInformation().getMediaInfo());
+            }
         } catch (TransientNetworkDisconnectionException | NoConnectionException e) {
             LOGE(TAG,
                     "getCastControllerPendingIntent(): Failed to get the remote media information");
@@ -2332,7 +2332,7 @@ public class VideoCastManager extends BaseCastManager
         }
         Uri imgUrl = null;
         Bitmap bm = null;
-        List<WebImage> images = video.getMetadata().getImages();
+        List<WebImage> images = video.getMediaInfo().getMetadata().getImages();
         if (Build.VERSION.SDK_INT > Build.VERSION_CODES.JELLY_BEAN_MR2) {
             if (images.size() > 1) {
                 imgUrl = images.get(1).getUrl();
@@ -2433,10 +2433,10 @@ public class VideoCastManager extends BaseCastManager
 
         try {
             MediaInfo info = getRemoteMediaInformation();
-            if (info == null) {
+            if (info == null || info.getMediaInfo() == null) {
                 return;
             }
-            final MediaMetadata mm = info.getMetadata();
+            final MediaMetadata mm = info.getMediaInfo().getMetadata();
             MediaMetadataCompat currentMetadata = mMediaSessionCompat.getController().getMetadata();
             MediaMetadataCompat.Builder newBuilder = currentMetadata == null
                     ? new MediaMetadataCompat.Builder()
@@ -2456,7 +2456,7 @@ public class VideoCastManager extends BaseCastManager
                     .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE,
                             mm.getString(MediaMetadata.KEY_SUBTITLE))
                     .putLong(MediaMetadataCompat.METADATA_KEY_DURATION,
-                            info.getStreamDuration())
+                            info.getMediaInfo().getStreamDuration())
                     .build();
             mMediaSessionCompat.setMetadata(metadata);
 

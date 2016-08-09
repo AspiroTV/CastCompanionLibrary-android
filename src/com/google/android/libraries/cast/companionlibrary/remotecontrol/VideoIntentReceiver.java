@@ -99,7 +99,7 @@ public class VideoIntentReceiver extends BroadcastReceiver {
                 break;
             case VideoCastNotificationService.ACTION_STOP:
                 LOGD(TAG, "Calling stopApplication from intent");
-                castManager.disconnectDevice(true, true, true);
+                castManager.disconnectDevice(false, true, true);
                 // we stop the notification service to make sure we are not left with an orphaned
                 // persistent notification if other things go wrong
                 if (castManager.getNotificationServiceClass() != null) {

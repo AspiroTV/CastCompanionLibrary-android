@@ -334,7 +334,7 @@ public class IntroductoryOverlay extends RelativeLayout {
         /**
          * Set the {@link MediaRouteButton} that the ovelay should focus on.
          */
-        public Builder setMediaRouteButton(MediaRouteButton button) {
+        public Builder setMediaRouteButton(View button) {
             mView = button;
             return this;
         }

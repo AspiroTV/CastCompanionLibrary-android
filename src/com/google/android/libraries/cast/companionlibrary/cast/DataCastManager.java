@@ -249,7 +249,7 @@ public class DataCastManager extends BaseCastManager implements Cast.MessageRece
     }
 
     @Override
-    public void onApplicationConnected(ApplicationMetadata appMetadata, String applicationStatus,
+    public void onApplicationConnected(com.noriginmedia.cast.wrap.ApplicationMetadata appMetadata, String applicationStatus,
             String sessionId, boolean wasLaunched) {
         LOGD(TAG, "onApplicationConnected() reached with sessionId: " + sessionId);
 

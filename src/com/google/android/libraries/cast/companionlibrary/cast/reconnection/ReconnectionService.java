@@ -53,6 +53,8 @@ public class ReconnectionService extends Service {
 
     private static final String TAG = LogUtils.makeLogTag(ReconnectionService.class);
     // the tolerance for considering a time value (in millis) to be zero
+    public static final boolean enabled = true;
+
     private static final long EPSILON_MS = 500;
     private static final int RECONNECTION_ATTEMPT_PERIOD_S = 15;
     private BroadcastReceiver mScreenOnOffBroadcastReceiver;

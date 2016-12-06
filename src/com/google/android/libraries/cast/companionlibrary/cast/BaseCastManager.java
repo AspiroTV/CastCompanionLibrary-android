@@ -64,6 +64,7 @@ import android.support.v7.media.MediaRouter;
 import android.support.v7.media.MediaRouter.RouteInfo;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 
 import java.io.IOException;
 import java.lang.annotation.Retention;
@@ -164,7 +165,7 @@ public abstract class BaseCastManager
      * Subclasses should implement this to react appropriately to the successful launch of their
      * application. This is called when the application is successfully launched.
      */
-    protected abstract void onApplicationConnected(ApplicationMetadata applicationMetadata,
+    protected abstract void onApplicationConnected(com.noriginmedia.cast.wrap.ApplicationMetadata applicationMetadata,
             String applicationStatus, String sessionId, boolean wasLaunched);
 
     /**
@@ -418,10 +419,11 @@ public abstract class BaseCastManager
      * </li>
      * </ul>
      */
-    public final void addMediaRouterButton(MediaRouteButton button) {
-        button.setRouteSelector(mMediaRouteSelector);
+    public final void addMediaRouterButton(View button) {
+        MediaRouteButton b = (MediaRouteButton)button;
+        b.setRouteSelector(mMediaRouteSelector);
         if (getMediaRouteDialogFactory() != null) {
-            button.setDialogFactory(getMediaRouteDialogFactory());
+            b.setDialogFactory(getMediaRouteDialogFactory());
         }
     }
 
@@ -1017,7 +1019,7 @@ public abstract class BaseCastManager
                         public void onResult(ApplicationConnectionResult result) {
                             if (result.getStatus().isSuccess()) {
                                 LOGD(TAG, "joinApplication() -> success");
-                                onApplicationConnected(result.getApplicationMetadata(),
+                                onApplicationConnected(new com.noriginmedia.cast.wrap.ApplicationMetadata(result.getApplicationMetadata()),
                                         result.getApplicationStatus(), result.getSessionId(),
                                         result.getWasLaunched());
                             } else {
@@ -1039,7 +1041,7 @@ public abstract class BaseCastManager
                                 public void onResult(ApplicationConnectionResult result) {
                                     if (result.getStatus().isSuccess()) {
                                         LOGD(TAG, "launchApplication() -> success result");
-                                        onApplicationConnected(result.getApplicationMetadata(),
+                                        onApplicationConnected(new com.noriginmedia.cast.wrap.ApplicationMetadata(result.getApplicationMetadata()),
                                                 result.getApplicationStatus(),
                                                 result.getSessionId(),
                                                 result.getWasLaunched());

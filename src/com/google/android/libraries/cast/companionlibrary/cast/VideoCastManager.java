@@ -87,13 +87,16 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.accessibility.CaptioningManager;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -148,7 +151,7 @@ public class VideoCastManager extends BaseCastManager
     private double mVolumeStep = DEFAULT_VOLUME_STEP;
     private TracksPreferenceManager mTrackManager;
     private MediaQueue mMediaQueue;
-    private MediaStatus mMediaStatus;
+    private com.noriginmedia.cast.wrap.MediaStatus mMediaStatus;
     private Timer mProgressTimer;
     private UpdateProgressTask mProgressTask;
     private FetchBitmapTask mLockScreenFetchTask;
@@ -282,7 +285,7 @@ public class VideoCastManager extends BaseCastManager
         checkConnectivity();
         checkRemoteMediaPlayerAvailable();
         if (mRemoteMediaPlayer.getStreamDuration() > 0 || isRemoteStreamLive()) {
-            MediaInfo mediaInfo = getRemoteMediaInformation();
+            MediaInfo mediaInfo = getRemoteMediaInformation() != null ? getRemoteMediaInformation().getMediaInfo() : null;
             MediaMetadata mm = mediaInfo.getMetadata();
             controller.setStreamType(mediaInfo.getStreamType());
             controller.setPlaybackStatus(mState, mIdleReason);
@@ -340,7 +343,7 @@ public class VideoCastManager extends BaseCastManager
     public void onTargetActivityInvoked(Context context) throws
             TransientNetworkDisconnectionException, NoConnectionException {
         Intent contentIntent = new Intent(mContext, mTargetActivity);
-        Bundle mediaWrapper = Utils.mediaInfoToBundle(getRemoteMediaInformation());
+        Bundle mediaWrapper = Utils.mediaInfoToBundle(getRemoteMediaInformation() != null ? getRemoteMediaInformation().getMediaInfo() : null);
         contentIntent.putExtra(VideoCastManager.EXTRA_MEDIA, mediaWrapper);
         context.startActivity(contentIntent);
     }
@@ -514,7 +517,7 @@ public class VideoCastManager extends BaseCastManager
                     return true;
                 } else {
                     // if we have not reached the end of queue, return true otherwise return false
-                    return mMediaStatus != null && (mMediaStatus.getLoadingItemId()
+                    return mMediaStatus != null && (mMediaStatus.getMediaStatus().getLoadingItemId()
                             != MediaQueueItem.INVALID_ITEM_ID);
                 }
             default:
@@ -531,7 +534,7 @@ public class VideoCastManager extends BaseCastManager
     public final boolean isRemoteStreamLive() throws TransientNetworkDisconnectionException,
             NoConnectionException {
         checkConnectivity();
-        MediaInfo info = getRemoteMediaInformation();
+        MediaInfo info = getRemoteMediaInformation() != null ? getRemoteMediaInformation().getMediaInfo() : null;
         return (info != null) && (info.getStreamType() == MediaInfo.STREAM_TYPE_LIVE);
     }
 
@@ -617,11 +620,11 @@ public class VideoCastManager extends BaseCastManager
      * @throws TransientNetworkDisconnectionException If framework is still trying to recover from
      * a possibly transient loss of network
      */
-    public MediaInfo getRemoteMediaInformation() throws TransientNetworkDisconnectionException,
+    public com.noriginmedia.cast.wrap.MediaInfo getRemoteMediaInformation() throws TransientNetworkDisconnectionException,
             NoConnectionException {
         checkConnectivity();
         checkRemoteMediaPlayerAvailable();
-        return mRemoteMediaPlayer.getMediaInfo();
+        return (mRemoteMediaPlayer.getMediaInfo() != null ? new com.noriginmedia.cast.wrap.MediaInfo(mRemoteMediaPlayer.getMediaInfo()) : null);
     }
 
     /**
@@ -870,7 +873,7 @@ public class VideoCastManager extends BaseCastManager
     }
 
     @Override
-    protected void onApplicationConnected(ApplicationMetadata appMetadata,
+    protected void onApplicationConnected(com.noriginmedia.cast.wrap.ApplicationMetadata appMetadata,
                                           String applicationStatus, String sessionId, boolean wasLaunched) {
         LOGD(TAG, "onApplicationConnected() reached with sessionId: " + sessionId
                 + ", and mReconnectionStatus=" + mReconnectionStatus);
@@ -980,7 +983,7 @@ public class VideoCastManager extends BaseCastManager
      * @throws NoConnectionException
      * @throws TransientNetworkDisconnectionException
      */
-    public void loadMedia(MediaInfo media, boolean autoPlay, int position)
+    public void loadMedia(com.noriginmedia.cast.wrap.MediaInfo media, boolean autoPlay, int position)
             throws TransientNetworkDisconnectionException, NoConnectionException {
         loadMedia(media, autoPlay, position, null);
     }
@@ -996,7 +999,7 @@ public class VideoCastManager extends BaseCastManager
      * @throws NoConnectionException
      * @throws TransientNetworkDisconnectionException
      */
-    public void loadMedia(MediaInfo media, boolean autoPlay, int position, JSONObject customData)
+    public void loadMedia(com.noriginmedia.cast.wrap.MediaInfo media, boolean autoPlay, int position, JSONObject customData)
             throws TransientNetworkDisconnectionException, NoConnectionException {
         loadMedia(media, null, autoPlay, position, customData);
     }
@@ -1014,7 +1017,7 @@ public class VideoCastManager extends BaseCastManager
      * @throws NoConnectionException
      * @throws TransientNetworkDisconnectionException
      */
-    public void loadMedia(MediaInfo media, final long[] activeTracks, boolean autoPlay,
+    public void loadMedia(com.noriginmedia.cast.wrap.MediaInfo media, final long[] activeTracks, boolean autoPlay,
             int position, JSONObject customData)
             throws TransientNetworkDisconnectionException, NoConnectionException {
         LOGD(TAG, "loadMedia");
@@ -1027,7 +1030,7 @@ public class VideoCastManager extends BaseCastManager
             throw new NoConnectionException();
         }
 
-        mRemoteMediaPlayer.load(mApiClient, media, autoPlay, position, activeTracks, customData)
+        mRemoteMediaPlayer.load(mApiClient, media.getMediaInfo(), autoPlay, position, activeTracks, customData)
                 .setResultCallback(new ResultCallback<RemoteMediaPlayer.MediaChannelResult>() {
 
                     @Override
@@ -1853,15 +1856,16 @@ public class VideoCastManager extends BaseCastManager
                             LOGD(TAG,
                                     "RemoteMediaPlayer::onQueueStatusUpdated() is "
                                             + "reached");
-                            mMediaStatus = mRemoteMediaPlayer.getMediaStatus();
+                            mMediaStatus = mRemoteMediaPlayer.getMediaStatus() != null ? new com.noriginmedia.cast.wrap.MediaStatus(mRemoteMediaPlayer.getMediaStatus()) : null;
                             if (mMediaStatus != null
-                                    && mMediaStatus.getQueueItems() != null) {
-                                List<MediaQueueItem> queueItems = mMediaStatus
+                                    && mMediaStatus.getMediaStatus() != null
+                                    && mMediaStatus.getMediaStatus().getQueueItems() != null) {
+                                List<MediaQueueItem> queueItems = mMediaStatus.getMediaStatus()
                                         .getQueueItems();
-                                int itemId = mMediaStatus.getCurrentItemId();
-                                MediaQueueItem item = mMediaStatus
+                                int itemId = mMediaStatus.getMediaStatus().getCurrentItemId();
+                                MediaQueueItem item = mMediaStatus.getMediaStatus()
                                         .getQueueItemById(itemId);
-                                int repeatMode = mMediaStatus.getQueueRepeatMode();
+                                int repeatMode = mMediaStatus.getMediaStatus().getQueueRepeatMode();
                                 onQueueUpdated(queueItems, item, repeatMode, false);
                             } else {
                                 onQueueUpdated(null, null,
@@ -1926,7 +1930,7 @@ public class VideoCastManager extends BaseCastManager
      * Returns the latest retrieved value for the {@link MediaStatus}. This value is updated
      * whenever the onStatusUpdated callback is called.
      */
-    public final MediaStatus getMediaStatus() {
+    public final com.noriginmedia.cast.wrap.MediaStatus getMediaStatus() {
         return mMediaStatus;
     }
 
@@ -2059,12 +2063,12 @@ public class VideoCastManager extends BaseCastManager
             LOGD(TAG, "mApiClient or mRemoteMediaPlayer is null, so will not proceed");
             return;
         }
-        mMediaStatus = mRemoteMediaPlayer.getMediaStatus();
-        List<MediaQueueItem> queueItems = mMediaStatus.getQueueItems();
+        mMediaStatus = new com.noriginmedia.cast.wrap.MediaStatus(mRemoteMediaPlayer.getMediaStatus());
+        List<MediaQueueItem> queueItems = mMediaStatus.getMediaStatus().getQueueItems();
         if (queueItems != null) {
-            int itemId = mMediaStatus.getCurrentItemId();
-            MediaQueueItem item = mMediaStatus.getQueueItemById(itemId);
-            int repeatMode = mMediaStatus.getQueueRepeatMode();
+            int itemId = mMediaStatus.getMediaStatus().getCurrentItemId();
+            MediaQueueItem item = mMediaStatus.getMediaStatus().getQueueItemById(itemId);
+            int repeatMode = mMediaStatus.getMediaStatus().getQueueRepeatMode();
             onQueueUpdated(queueItems, item, repeatMode, false);
         } else {
             onQueueUpdated(null, null, MediaStatus.REPEAT_MODE_REPEAT_OFF, false);
@@ -2092,7 +2096,7 @@ public class VideoCastManager extends BaseCastManager
                 updateMediaSession(false);
                 switch (mIdleReason) {
                     case MediaStatus.IDLE_REASON_FINISHED:
-                        if (mMediaStatus.getLoadingItemId() == MediaQueueItem.INVALID_ITEM_ID) {
+                        if (mMediaStatus.getMediaStatus().getLoadingItemId() == MediaQueueItem.INVALID_ITEM_ID) {
                             // we have reached the end of queue
                             clearMediaSession();
                             makeUiHidden = true;
@@ -2111,7 +2115,7 @@ public class VideoCastManager extends BaseCastManager
                         makeUiHidden = true;
                         break;
                     case MediaStatus.IDLE_REASON_INTERRUPTED:
-                        if (mMediaStatus.getLoadingItemId() == MediaQueueItem.INVALID_ITEM_ID) {
+                        if (mMediaStatus.getMediaStatus().getLoadingItemId() == MediaQueueItem.INVALID_ITEM_ID) {
                             // we have reached the end of queue
                             clearMediaSession();
                             makeUiHidden = true;
@@ -2145,9 +2149,9 @@ public class VideoCastManager extends BaseCastManager
 
     private void onRemoteMediaPreloadStatusUpdated() {
         MediaQueueItem item = null;
-        mMediaStatus = mRemoteMediaPlayer.getMediaStatus();
+        mMediaStatus = mRemoteMediaPlayer.getMediaStatus() != null ? new com.noriginmedia.cast.wrap.MediaStatus(mRemoteMediaPlayer.getMediaStatus()) : null;
         if (mMediaStatus != null) {
-            item = mMediaStatus.getQueueItemById(mMediaStatus.getPreloadedItemId());
+            item = mMediaStatus.getMediaStatus().getQueueItemById(mMediaStatus.getMediaStatus().getPreloadedItemId());
         }
         mPreLoadingItem = item;
         updateMiniControllersVisibilityForUpcoming(item);
@@ -2191,7 +2195,7 @@ public class VideoCastManager extends BaseCastManager
             consumer.onRemoteMediaPlayerMetadataUpdated();
         }
         try {
-            updateLockScreenImage(getRemoteMediaInformation());
+            updateLockScreenImage(getRemoteMediaInformation() != null ? getRemoteMediaInformation().getMediaInfo() : null);
         } catch (TransientNetworkDisconnectionException | NoConnectionException e) {
             LOGE(TAG, "Failed to update lock screen metadata due to a network issue", e);
         }
@@ -2300,7 +2304,7 @@ public class VideoCastManager extends BaseCastManager
     private PendingIntent getCastControllerPendingIntent() {
         Bundle mediaWrapper = null;
         try {
-            mediaWrapper = Utils.mediaInfoToBundle(getRemoteMediaInformation());
+            mediaWrapper = Utils.mediaInfoToBundle(getRemoteMediaInformation() != null ? getRemoteMediaInformation().getMediaInfo() : null);
         } catch (TransientNetworkDisconnectionException | NoConnectionException e) {
             LOGE(TAG,
                     "getCastControllerPendingIntent(): Failed to get the remote media information");
@@ -2397,7 +2401,7 @@ public class VideoCastManager extends BaseCastManager
                 + mMediaSessionCompat + " playing: " + playing);
         try {
             if ((mMediaSessionCompat == null) && playing) {
-                setUpMediaSession(getRemoteMediaInformation());
+                setUpMediaSession(getRemoteMediaInformation() != null ? getRemoteMediaInformation().getMediaInfo() : null);
             }
             if (mMediaSessionCompat != null) {
                 int playState = isRemoteStreamLive() ? PlaybackStateCompat.STATE_BUFFERING
@@ -2432,7 +2436,7 @@ public class VideoCastManager extends BaseCastManager
         }
 
         try {
-            MediaInfo info = getRemoteMediaInformation();
+            MediaInfo info = getRemoteMediaInformation() != null ? getRemoteMediaInformation().getMediaInfo() : null;
             if (info == null) {
                 return;
             }
@@ -3062,5 +3066,9 @@ public class VideoCastManager extends BaseCastManager
      */
     protected String getDataNamespace() {
         return mDataNamespace;
+    }
+
+    public static JSONObject buildCustomData(com.noriginmedia.cast.wrap.MediaMetadata mMediaMetadata){
+        return null;
     }
 }

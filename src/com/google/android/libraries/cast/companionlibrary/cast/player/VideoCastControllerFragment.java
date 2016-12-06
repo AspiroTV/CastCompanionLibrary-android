@@ -235,7 +235,7 @@ public class VideoCastControllerFragment extends Fragment implements
         @Override
         public void onRemoteMediaPlayerMetadataUpdated() {
             try {
-                mSelectedMedia = mCastManager.getRemoteMediaInformation();
+                mSelectedMedia = mCastManager.getRemoteMediaInformation() != null ? mCastManager.getRemoteMediaInformation().getMediaInfo() : null;
                 updateClosedCaptionState();
                 updateMetadata();
             } catch (TransientNetworkDisconnectionException | NoConnectionException e) {
@@ -346,7 +346,7 @@ public class VideoCastControllerFragment extends Fragment implements
                 // need to start remote playback
                 mPlaybackState = MediaStatus.PLAYER_STATE_BUFFERING;
                 mCastController.setPlaybackStatus(mPlaybackState);
-                mCastManager.loadMedia(mSelectedMedia, true, startPoint, customData);
+                mCastManager.loadMedia(new com.noriginmedia.cast.wrap.MediaInfo(mSelectedMedia), true, startPoint, customData);
             } else {
                 // we don't change the status of remote playback
                 if (mCastManager.isRemoteMediaPlaying()) {
@@ -439,7 +439,7 @@ public class VideoCastControllerFragment extends Fragment implements
 
     private void updatePlayerStatus() {
         int mediaStatus = mCastManager.getPlaybackStatus();
-        mMediaStatus = mCastManager.getMediaStatus();
+        mMediaStatus = mCastManager.getMediaStatus().getMediaStatus();
         LOGD(TAG, "updatePlayerStatus(), state: " + mediaStatus);
         if (mSelectedMedia == null) {
             return;
@@ -538,13 +538,13 @@ public class VideoCastControllerFragment extends Fragment implements
                     return;
                 }
             }
-            mMediaStatus = mCastManager.getMediaStatus();
+            mMediaStatus = mCastManager.getMediaStatus().getMediaStatus();
             mCastManager.addVideoCastConsumer(mCastConsumer);
             if (!mIsFresh) {
                 updatePlayerStatus();
                 // updating metadata in case another client has changed it and we are resuming the
                 // activity
-                mSelectedMedia = mCastManager.getRemoteMediaInformation();
+                mSelectedMedia = mCastManager.getRemoteMediaInformation() != null ? mCastManager.getRemoteMediaInformation().getMediaInfo() : null;
                 updateClosedCaptionState();
                 updateMetadata();
             }
@@ -722,7 +722,7 @@ public class VideoCastControllerFragment extends Fragment implements
                         && (mCastManager.getIdleReason() == MediaStatus.IDLE_REASON_CANCELED)) {
                     mCastManager.play();
                 } else {
-                    mCastManager.loadMedia(mSelectedMedia, true, 0);
+                    mCastManager.loadMedia(new com.noriginmedia.cast.wrap.MediaInfo(mSelectedMedia), true, 0);
                 }
                 mPlaybackState = MediaStatus.PLAYER_STATE_BUFFERING;
                 restartTrickplayTimer();

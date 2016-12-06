@@ -16,7 +16,6 @@
 
 package com.google.android.libraries.cast.companionlibrary.cast.callbacks;
 
-import com.google.android.gms.cast.ApplicationMetadata;
 import com.google.android.gms.cast.Cast;
 import com.google.android.gms.cast.CastDevice;
 import com.google.android.gms.cast.MediaQueueItem;
@@ -38,7 +37,7 @@ public interface VideoCastConsumer extends BaseCastConsumer {
      * session ID is returned. <code>wasLaunched</code> indicates if the application was launched or
      * joined.
      */
-    void onApplicationConnected(ApplicationMetadata appMetadata,
+    void onApplicationConnected(com.noriginmedia.cast.wrap.ApplicationMetadata appMetadata,
             String sessionId, boolean wasLaunched);
 
     /**

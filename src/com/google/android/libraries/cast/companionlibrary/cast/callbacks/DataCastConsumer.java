@@ -30,7 +30,7 @@ public interface DataCastConsumer extends BaseCastConsumer {
      * session ID is returned. <code>wasLaunched</code> indicates if the application was launched or
      * joined.
      */
-    void onApplicationConnected(ApplicationMetadata appMetadata,
+    void onApplicationConnected(com.noriginmedia.cast.wrap.ApplicationMetadata appMetadata,
             String applicationStatus, String sessionId, boolean wasLaunched);
 
     /**

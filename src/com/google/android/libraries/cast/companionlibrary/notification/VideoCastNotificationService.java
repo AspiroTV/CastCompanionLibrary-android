@@ -64,6 +64,8 @@ public class VideoCastNotificationService extends Service {
 
     private static final String TAG = LogUtils.makeLogTag(VideoCastNotificationService.class);
 
+    public static final boolean enabled = true;
+
     public static final String ACTION_FORWARD =
             "com.google.android.libraries.cast.companionlibrary.action.forward";
     public static final String ACTION_REWIND =
@@ -124,7 +126,7 @@ public class VideoCastNotificationService extends Service {
                 onRemoteMediaPlayerStatusUpdated(mCastManager.getPlaybackStatus());
                 if (mNotification == null) {
                     try {
-                        setUpNotification(mCastManager.getRemoteMediaInformation());
+                        setUpNotification(mCastManager.getRemoteMediaInformation() != null ? mCastManager.getRemoteMediaInformation().getMediaInfo() : null);
                     } catch (TransientNetworkDisconnectionException | NoConnectionException e) {
                         LOGE(TAG, "onStartCommand() failed to get media", e);
                     }
@@ -200,15 +202,15 @@ public class VideoCastNotificationService extends Service {
             switch (mediaStatus) {
                 case MediaStatus.PLAYER_STATE_BUFFERING: // (== 4)
                     mIsPlaying = false;
-                    setUpNotification(mCastManager.getRemoteMediaInformation());
+                    setUpNotification(mCastManager.getRemoteMediaInformation() != null ? mCastManager.getRemoteMediaInformation().getMediaInfo() : null);
                     break;
                 case MediaStatus.PLAYER_STATE_PLAYING: // (== 2)
                     mIsPlaying = true;
-                    setUpNotification(mCastManager.getRemoteMediaInformation());
+                    setUpNotification(mCastManager.getRemoteMediaInformation() != null ? mCastManager.getRemoteMediaInformation().getMediaInfo() : null);
                     break;
                 case MediaStatus.PLAYER_STATE_PAUSED: // (== 3)
                     mIsPlaying = false;
-                    setUpNotification(mCastManager.getRemoteMediaInformation());
+                    setUpNotification(mCastManager.getRemoteMediaInformation() != null ? mCastManager.getRemoteMediaInformation().getMediaInfo() : null);
                     break;
                 case MediaStatus.PLAYER_STATE_IDLE: // (== 1)
                     mIsPlaying = false;
@@ -216,7 +218,7 @@ public class VideoCastNotificationService extends Service {
                             mCastManager.getIdleReason())) {
                         stopForeground(true);
                     } else {
-                        setUpNotification(mCastManager.getRemoteMediaInformation());
+                        setUpNotification(mCastManager.getRemoteMediaInformation() != null ? mCastManager.getRemoteMediaInformation().getMediaInfo() : null);
                     }
                     break;
                 case MediaStatus.PLAYER_STATE_UNKNOWN: // (== 0)
@@ -496,7 +498,7 @@ public class VideoCastNotificationService extends Service {
 
                         if (mNotification == null) {
                             try {
-                                setUpNotification(mCastManager.getRemoteMediaInformation());
+                                setUpNotification(mCastManager.getRemoteMediaInformation() != null ? mCastManager.getRemoteMediaInformation().getMediaInfo() : null);
                             } catch (TransientNetworkDisconnectionException | NoConnectionException e) {
                                 LOGE(TAG, "onStartCommand() failed to get media", e);
                             }

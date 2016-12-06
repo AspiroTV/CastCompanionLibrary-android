@@ -16,7 +16,6 @@
 
 package com.google.android.libraries.cast.companionlibrary.cast.callbacks;
 
-import com.google.android.gms.cast.ApplicationMetadata;
 import com.google.android.gms.cast.MediaQueueItem;
 import com.google.android.gms.cast.TextTrackStyle;
 
@@ -34,7 +33,7 @@ public class VideoCastConsumerImpl extends BaseCastConsumerImpl
         implements VideoCastConsumer {
 
     @Override
-    public void onApplicationConnected(ApplicationMetadata appMetadata,
+    public void onApplicationConnected(com.noriginmedia.cast.wrap.ApplicationMetadata appMetadata,
             String sessionId, boolean wasLaunched) {
     }
 

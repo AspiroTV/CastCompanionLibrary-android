@@ -146,7 +146,7 @@ public class VideoMediaRouteControllerDialog extends MediaRouteControllerDialog 
     }
 
     private void updateMetadata() {
-        MediaInfo info;
+        com.noriginmedia.cast.wrap.MediaInfo info;
         try {
             info = mCastManager.getRemoteMediaInformation();
         } catch (TransientNetworkDisconnectionException | NoConnectionException e) {
@@ -159,7 +159,7 @@ public class VideoMediaRouteControllerDialog extends MediaRouteControllerDialog 
         }
         mStreamType = info.getStreamType();
         hideControls(false, 0);
-        MediaMetadata mm = info.getMetadata();
+        MediaMetadata mm = info.getMetadata().getMediaMetadata();
         mTitle.setText(mm.getString(MediaMetadata.KEY_TITLE));
         mSubTitle.setText(mm.getString(MediaMetadata.KEY_SUBTITLE));
         setIcon(mm.hasImages() ? mm.getImages().get(0).getUrl() : null);

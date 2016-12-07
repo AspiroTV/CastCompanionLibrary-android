@@ -678,9 +678,9 @@ public class VideoCastControllerFragment extends Fragment implements
             if (mPlaybackState == MediaStatus.PLAYER_STATE_PLAYING) {
                 mPlaybackState = MediaStatus.PLAYER_STATE_BUFFERING;
                 mCastController.setPlaybackStatus(mPlaybackState);
-                mCastManager.play(seekBar.getProgress());
+                mCastManager.play(seekBar.getProgress(), true);
             } else if (mPlaybackState == MediaStatus.PLAYER_STATE_PAUSED) {
-                mCastManager.seek(seekBar.getProgress());
+                mCastManager.seek(seekBar.getProgress(), true);
             }
             restartTrickplayTimer();
         } catch (Exception e) {

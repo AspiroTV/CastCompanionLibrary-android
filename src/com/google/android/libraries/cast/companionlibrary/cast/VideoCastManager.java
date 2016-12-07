@@ -1561,8 +1561,10 @@ public class VideoCastManager extends BaseCastManager
      * @throws NoConnectionException
      * @throws TransientNetworkDisconnectionException
      */
-    public void play(int position) throws TransientNetworkDisconnectionException,
+    public void play(int position, boolean isFinal) throws TransientNetworkDisconnectionException,
             NoConnectionException {
+        if (isFinal)
+            return;
         checkConnectivity();
         LOGD(TAG, "attempting to play media at position " + position + " seconds");
         if (mRemoteMediaPlayer == null) {
@@ -1704,8 +1706,10 @@ public class VideoCastManager extends BaseCastManager
      * @throws NoConnectionException
      * @throws TransientNetworkDisconnectionException
      */
-    public void seek(int position) throws TransientNetworkDisconnectionException,
+    public void seek(int position, boolean isFinal) throws TransientNetworkDisconnectionException,
             NoConnectionException {
+        if (isFinal)
+            return;
         LOGD(TAG, "attempting to seek media");
         checkConnectivity();
         if (mRemoteMediaPlayer == null) {
@@ -1744,7 +1748,7 @@ public class VideoCastManager extends BaseCastManager
             throw new NoConnectionException();
         }
         long position = mRemoteMediaPlayer.getApproximateStreamPosition() + lengthInMillis;
-        seek((int) position);
+        seek((int) position, true);
     }
 
     /**

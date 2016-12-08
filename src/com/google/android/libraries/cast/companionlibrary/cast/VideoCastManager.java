@@ -135,6 +135,9 @@ import java.util.concurrent.TimeUnit;
 public class VideoCastManager extends BaseCastManager
         implements OnMiniControllerChangedListener, OnFailedListener {
 
+
+    public final static String CAST = "chromecast";
+
     private static final String TAG = LogUtils.makeLogTag(VideoCastManager.class);
 
     public static final String EXTRA_HAS_AUTH = "hasAuth";

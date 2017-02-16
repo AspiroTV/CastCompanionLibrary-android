@@ -16,11 +16,32 @@
 
 package com.google.android.libraries.cast.companionlibrary.cast;
 
-import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGD;
-import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGE;
-import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGI;
+import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
+import android.app.PendingIntent;
+import android.app.Service;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.res.Resources.NotFoundException;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Point;
+import android.media.AudioManager;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.preference.PreferenceScreen;
+import android.support.annotation.NonNull;
+import android.support.v4.media.MediaMetadataCompat;
+import android.support.v4.media.session.MediaSessionCompat;
+import android.support.v4.media.session.PlaybackStateCompat;
+import android.support.v7.media.MediaRouter.RouteInfo;
+import android.text.TextUtils;
+import android.view.KeyEvent;
+import android.view.View;
+import android.view.accessibility.CaptioningManager;
 
-import com.google.android.gms.cast.ApplicationMetadata;
 import com.google.android.gms.cast.Cast;
 import com.google.android.gms.cast.Cast.CastOptions.Builder;
 import com.google.android.gms.cast.Cast.MessageReceivedCallback;
@@ -60,49 +81,24 @@ import com.google.android.libraries.cast.companionlibrary.widgets.MiniController
 import com.google.android.libraries.cast.companionlibrary.widgets.MiniController.OnMiniControllerChangedListener;
 import com.google.android.libraries.cast.companionlibrary.widgets.ProgressWatcher;
 
-import android.annotation.SuppressLint;
-import android.annotation.TargetApi;
-import android.app.PendingIntent;
-import android.app.Service;
-import android.content.ComponentName;
-import android.content.Context;
-import android.content.Intent;
-import android.content.res.Resources.NotFoundException;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Point;
-import android.media.AudioManager;
-import android.net.Uri;
-import android.nfc.Tag;
-import android.os.Build;
-import android.os.Bundle;
-import android.preference.PreferenceScreen;
-import android.support.annotation.NonNull;
-import android.support.v4.media.MediaMetadataCompat;
-import android.support.v4.media.session.MediaSessionCompat;
-import android.support.v4.media.session.PlaybackStateCompat;
-import android.support.v7.media.MediaRouter.RouteInfo;
-import android.text.TextUtils;
-import android.view.KeyEvent;
-import android.view.View;
-import android.view.accessibility.CaptioningManager;
-
-import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+
+import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGD;
+import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGE;
+import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGI;
 
 /**
  * A subclass of {@link BaseCastManager} that is suitable for casting video contents (it
@@ -154,9 +150,9 @@ public class VideoCastManager extends BaseCastManager
     private double mVolumeStep = DEFAULT_VOLUME_STEP;
     private TracksPreferenceManager mTrackManager;
     private MediaQueue mMediaQueue;
+
     private com.noriginmedia.cast.wrap.MediaStatus mMediaStatus;
-    private Timer mProgressTimer;
-    private UpdateProgressTask mProgressTask;
+
     private FetchBitmapTask mLockScreenFetchTask;
     private FetchBitmapTask mMediaSessionIconFetchTask;
 
@@ -190,6 +186,8 @@ public class VideoCastManager extends BaseCastManager
     private MediaAuthService mAuthService;
     private long mLiveStreamDuration = DEFAULT_LIVE_STREAM_DURATION_MS;
     private MediaQueueItem mPreLoadingItem;
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private ScheduledFuture<?> mProgressHandler;
 
     public static final int QUEUE_OPERATION_LOAD = 1;
     public static final int QUEUE_OPERATION_INSERT_ITEMS = 2;
@@ -240,7 +238,7 @@ public class VideoCastManager extends BaseCastManager
     }
 
     public static synchronized VideoCastManager initialize(Context context,
-            CastConfiguration castConfiguration) {
+                                                           CastConfiguration castConfiguration) {
         if (sInstance == null) {
             LOGD(TAG, "New instance of VideoCastManager is created");
             if (ConnectionResult.SUCCESS != GooglePlayServicesUtil
@@ -249,7 +247,6 @@ public class VideoCastManager extends BaseCastManager
                 LOGE(TAG, msg);
             }
             sInstance = new VideoCastManager(context, castConfiguration);
-            sInstance.restartProgressTimer();
         }
         sInstance.setupTrackManager();
         return sInstance;
@@ -259,7 +256,6 @@ public class VideoCastManager extends BaseCastManager
      * Returns a (singleton) instance of this class. Clients should call this method in order to
      * get a hold of this singleton instance, only after it is initialized. If it is not initialized
      * yet, an {@link IllegalStateException} will be thrown.
-     *
      */
     public static VideoCastManager getInstance() {
         if (sInstance == null) {
@@ -401,15 +397,15 @@ public class VideoCastManager extends BaseCastManager
     /**
      * Launches the VideoCastControllerActivity that provides a default Cast Player page.
      *
-     * @param context The context to use for starting the activity
+     * @param context      The context to use for starting the activity
      * @param mediaWrapper a bundle wrapper for the media that is or will be casted
-     * @param position Starting point, in milliseconds,  of the media playback
-     * @param shouldStart indicates if the remote playback should start after launching the new
-     * page
-     * @param customData Optional {@link JSONObject}
+     * @param position     Starting point, in milliseconds,  of the media playback
+     * @param shouldStart  indicates if the remote playback should start after launching the new
+     *                     page
+     * @param customData   Optional {@link JSONObject}
      */
     public void startVideoCastControllerActivity(Context context, Bundle mediaWrapper, int position,
-            boolean shouldStart, JSONObject customData) {
+                                                 boolean shouldStart, JSONObject customData) {
         Intent intent = new Intent(context, VideoCastControllerActivity.class);
         intent.putExtra(EXTRA_MEDIA, mediaWrapper);
         intent.putExtra(EXTRA_START_POINT, position);
@@ -424,14 +420,14 @@ public class VideoCastManager extends BaseCastManager
     /**
      * Launches the {@link VideoCastControllerActivity} that provides a default Cast Player page.
      *
-     * @param context The context to use for starting the activity
+     * @param context      The context to use for starting the activity
      * @param mediaWrapper A bundle wrapper for the media that is or will be casted
-     * @param position Starting point, in milliseconds,  of the media playback
-     * @param shouldStart Indicates if the remote playback should start after launching the new
-     * page
+     * @param position     Starting point, in milliseconds,  of the media playback
+     * @param shouldStart  Indicates if the remote playback should start after launching the new
+     *                     page
      */
     public void startVideoCastControllerActivity(Context context, Bundle mediaWrapper, int position,
-            boolean shouldStart) {
+                                                 boolean shouldStart) {
         startVideoCastControllerActivity(context, mediaWrapper, position, shouldStart, null);
     }
 
@@ -454,13 +450,13 @@ public class VideoCastManager extends BaseCastManager
     /**
      * Launches the {@link VideoCastControllerActivity} that provides a default Cast Player page.
      *
-     * @param context The context to use for starting the activity
-     * @param mediaInfo The media that is or will be casted
-     * @param position Starting point, in milliseconds,  of the media playback
+     * @param context     The context to use for starting the activity
+     * @param mediaInfo   The media that is or will be casted
+     * @param position    Starting point, in milliseconds,  of the media playback
      * @param shouldStart Indicates if the remote playback should start after launching the new page
      */
     public void startVideoCastControllerActivity(Context context,
-            MediaInfo mediaInfo, int position, boolean shouldStart) {
+                                                 MediaInfo mediaInfo, int position, boolean shouldStart) {
         startVideoCastControllerActivity(context, Utils.mediaInfoToBundle(mediaInfo), position,
                 shouldStart);
     }
@@ -563,9 +559,9 @@ public class VideoCastManager extends BaseCastManager
      * Returns the url for the movie that is currently playing on the remote device. If there is no
      * connection, this will return <code>null</code>.
      *
-     * @throws NoConnectionException If no connectivity to the device exists
+     * @throws NoConnectionException                  If no connectivity to the device exists
      * @throws TransientNetworkDisconnectionException If framework is still trying to recover from
-     * a possibly transient loss of network
+     *                                                a possibly transient loss of network
      */
     public String getRemoteMediaUrl() throws TransientNetworkDisconnectionException,
             NoConnectionException {
@@ -619,9 +615,9 @@ public class VideoCastManager extends BaseCastManager
     /**
      * Returns the {@link MediaInfo} for the current media
      *
-     * @throws NoConnectionException If no connectivity to the device exists
+     * @throws NoConnectionException                  If no connectivity to the device exists
      * @throws TransientNetworkDisconnectionException If framework is still trying to recover from
-     * a possibly transient loss of network
+     *                                                a possibly transient loss of network
      */
     public com.noriginmedia.cast.wrap.MediaInfo getRemoteMediaInformation() throws TransientNetworkDisconnectionException,
             NoConnectionException {
@@ -633,9 +629,9 @@ public class VideoCastManager extends BaseCastManager
     /**
      * Gets the remote's system volume. It internally detects what type of volume is used.
      *
-     * @throws NoConnectionException If no connectivity to the device exists
+     * @throws NoConnectionException                  If no connectivity to the device exists
      * @throws TransientNetworkDisconnectionException If framework is still trying to recover from
-     * a possibly transient loss of network
+     *                                                a possibly transient loss of network
      */
     public double getVolume() throws TransientNetworkDisconnectionException, NoConnectionException {
         checkConnectivity();
@@ -653,8 +649,7 @@ public class VideoCastManager extends BaseCastManager
      * @param volume Should be a value between 0 and 1, inclusive.
      * @throws NoConnectionException
      * @throws TransientNetworkDisconnectionException
-     * @throws CastException If setting system volume fails
-     *
+     * @throws CastException                          If setting system volume fails
      * @see {link #setVolumeType()}
      */
     public void setVolume(double volume) throws CastException,
@@ -688,9 +683,9 @@ public class VideoCastManager extends BaseCastManager
      * Increments (or decrements) the volume by the given amount. It internally determines if this
      * should be done for stream or device volume.
      *
-     * @throws NoConnectionException If no connectivity to the device exists
+     * @throws NoConnectionException                  If no connectivity to the device exists
      * @throws TransientNetworkDisconnectionException If framework is still trying to recover from
-     * a possibly transient loss of network
+     *                                                a possibly transient loss of network
      * @throws CastException
      */
     public void adjustVolume(double delta) throws CastException,
@@ -979,10 +974,10 @@ public class VideoCastManager extends BaseCastManager
     /**
      * Loads a media. For this to succeed, you need to have successfully launched the application.
      *
-     * @param media The media to be loaded
+     * @param media    The media to be loaded
      * @param autoPlay If <code>true</code>, playback starts after load
      * @param position Where to start the playback (only used if autoPlay is <code>true</code>.
-     * Units is milliseconds.
+     *                 Units is milliseconds.
      * @throws NoConnectionException
      * @throws TransientNetworkDisconnectionException
      */
@@ -994,10 +989,10 @@ public class VideoCastManager extends BaseCastManager
     /**
      * Loads a media. For this to succeed, you need to have successfully launched the application.
      *
-     * @param media The media to be loaded
-     * @param autoPlay If <code>true</code>, playback starts after load
-     * @param position Where to start the playback (only used if autoPlay is <code>true</code>).
-     * Units is milliseconds.
+     * @param media      The media to be loaded
+     * @param autoPlay   If <code>true</code>, playback starts after load
+     * @param position   Where to start the playback (only used if autoPlay is <code>true</code>).
+     *                   Units is milliseconds.
      * @param customData Optional {@link JSONObject} data to be passed to the cast device
      * @throws NoConnectionException
      * @throws TransientNetworkDisconnectionException
@@ -1010,18 +1005,18 @@ public class VideoCastManager extends BaseCastManager
     /**
      * Loads a media. For this to succeed, you need to have successfully launched the application.
      *
-     * @param media The media to be loaded
+     * @param media        The media to be loaded
      * @param activeTracks An array containing the list of track IDs to be set active for this
-     * media upon a successful load
-     * @param autoPlay If <code>true</code>, playback starts after load
-     * @param position Where to start the playback (only used if autoPlay is <code>true</code>).
-     * Units is milliseconds.
-     * @param customData Optional {@link JSONObject} data to be passed to the cast device
+     *                     media upon a successful load
+     * @param autoPlay     If <code>true</code>, playback starts after load
+     * @param position     Where to start the playback (only used if autoPlay is <code>true</code>).
+     *                     Units is milliseconds.
+     * @param customData   Optional {@link JSONObject} data to be passed to the cast device
      * @throws NoConnectionException
      * @throws TransientNetworkDisconnectionException
      */
     public void loadMedia(com.noriginmedia.cast.wrap.MediaInfo media, final long[] activeTracks, boolean autoPlay,
-            int position, JSONObject customData)
+                          int position, JSONObject customData)
             throws TransientNetworkDisconnectionException, NoConnectionException {
         LOGD(TAG, "loadMedia");
         checkConnectivity();
@@ -1044,11 +1039,12 @@ public class VideoCastManager extends BaseCastManager
                     }
                 });
     }
+
     /**
      * Loads and optionally starts playback of a new queue of media items.
      *
-     * @param items Array of items to load, in the order that they should be played. Must not be
-     *              {@code null} or empty.
+     * @param items      Array of items to load, in the order that they should be played. Must not be
+     *                   {@code null} or empty.
      * @param startIndex The array index of the item in the {@code items} array that should be
      *                   played first (i.e., it will become the currentItem).If {@code repeatMode}
      *                   is {@link MediaStatus#REPEAT_MODE_REPEAT_OFF} playback will end when the
@@ -1071,7 +1067,7 @@ public class VideoCastManager extends BaseCastManager
      * @throws NoConnectionException
      */
     public void queueLoad(final MediaQueueItem[] items, final int startIndex, final int repeatMode,
-            final JSONObject customData)
+                          final JSONObject customData)
             throws TransientNetworkDisconnectionException, NoConnectionException {
         LOGD(TAG, "queueLoad");
         checkConnectivity();
@@ -1099,22 +1095,22 @@ public class VideoCastManager extends BaseCastManager
     /**
      * Inserts a list of new media items into the queue.
      *
-     * @param itemsToInsert List of items to insert into the queue, in the order that they should be
-     *                      played. The itemId field of the items should be unassigned or the
-     *                      request will fail with an INVALID_PARAMS error. Must not be {@code null}
-     *                      or empty.
+     * @param itemsToInsert      List of items to insert into the queue, in the order that they should be
+     *                           played. The itemId field of the items should be unassigned or the
+     *                           request will fail with an INVALID_PARAMS error. Must not be {@code null}
+     *                           or empty.
      * @param insertBeforeItemId ID of the item that will be located immediately after the inserted
      *                           list. If the value is {@link MediaQueueItem#INVALID_ITEM_ID} or
      *                           invalid, the inserted list will be appended to the end of the
      *                           queue.
-     * @param customData Custom application-specific data to pass along with the request. May be
-     *                   {@code null}.
+     * @param customData         Custom application-specific data to pass along with the request. May be
+     *                           {@code null}.
      * @throws TransientNetworkDisconnectionException
      * @throws NoConnectionException
      * @throws IllegalArgumentException
      */
     public void queueInsertItems(final MediaQueueItem[] itemsToInsert, final int insertBeforeItemId,
-            final JSONObject customData)
+                                 final JSONObject customData)
             throws TransientNetworkDisconnectionException, NoConnectionException {
         LOGD(TAG, "queueInsertItems");
         checkConnectivity();
@@ -1150,8 +1146,8 @@ public class VideoCastManager extends BaseCastManager
      *                      unchanged. The tracks information can not change once the item is loaded
      *                      (if the item is the currentItem). If any of the items does not exist it
      *                      will be ignored.
-     * @param customData Custom application-specific data to pass along with the request. May be
-     *                   {@code null}.
+     * @param customData    Custom application-specific data to pass along with the request. May be
+     *                      {@code null}.
      * @throws TransientNetworkDisconnectionException
      * @throws NoConnectionException
      */
@@ -1184,7 +1180,7 @@ public class VideoCastManager extends BaseCastManager
      * If {@code itemId} is not found in the queue, this method will report success without sending
      * a request to the receiver.
      *
-     * @param itemId The ID of the item to which to jump.
+     * @param itemId     The ID of the item to which to jump.
      * @param customData Custom application-specific data to pass along with the request. May be
      *                   {@code null}.
      * @throws TransientNetworkDisconnectionException
@@ -1222,8 +1218,8 @@ public class VideoCastManager extends BaseCastManager
      *
      * @param itemIdsToRemove The list of media item IDs to remove. Must not be {@code null} or
      *                        empty.
-     * @param customData Custom application-specific data to pass along with the request. May be
-     *                   {@code null}.
+     * @param customData      Custom application-specific data to pass along with the request. May be
+     *                        {@code null}.
      * @throws TransientNetworkDisconnectionException
      * @throws NoConnectionException
      * @throws IllegalArgumentException
@@ -1261,7 +1257,7 @@ public class VideoCastManager extends BaseCastManager
      * a request to the receiver. A {@code itemId} may not be in the queue because it wasn't
      * originally in the queue, or it was removed by another sender.
      *
-     * @param itemId The ID of the item to be removed.
+     * @param itemId     The ID of the item to be removed.
      * @param customData Custom application-specific data to pass along with the request. May be
      *                   {@code null}.
      * @throws TransientNetworkDisconnectionException
@@ -1297,41 +1293,41 @@ public class VideoCastManager extends BaseCastManager
     /**
      * Reorder a list of media items in the queue.
      *
-     * @param itemIdsToReorder The list of media item IDs to reorder, in the new order. Any other
-     *                         items currently in the queue will maintain their existing order. The
-     *                         list will be inserted just before the item specified by
-     *                         {@code insertBeforeItemId}, or at the end of the queue if
-     *                         {@code insertBeforeItemId} is {@link MediaQueueItem#INVALID_ITEM_ID}.
-     *                         <p>
-     *                         For example:
-     *                         <p>
-     *                         If insertBeforeItemId is not specified <br>
-     *                         Existing queue: "A","D","G","H","B","E" <br>
-     *                         itemIds: "D","H","B" <br>
-     *                         New Order: "A","G","E","D","H","B" <br>
-     *                         <p>
-     *                         If insertBeforeItemId is "A" <br>
-     *                         Existing queue: "A","D","G","H","B" <br>
-     *                         itemIds: "D","H","B" <br>
-     *                         New Order: "D","H","B","A","G","E" <br>
-     *                         <p>
-     *                         If insertBeforeItemId is "G" <br>
-     *                         Existing queue: "A","D","G","H","B" <br>
-     *                         itemIds: "D","H","B" <br>
-     *                         New Order: "A","D","H","B","G","E" <br>
-     *                         <p>
-     *                         If any of the items does not exist it will be ignored.
-     *                         Must not be {@code null} or empty.
+     * @param itemIdsToReorder   The list of media item IDs to reorder, in the new order. Any other
+     *                           items currently in the queue will maintain their existing order. The
+     *                           list will be inserted just before the item specified by
+     *                           {@code insertBeforeItemId}, or at the end of the queue if
+     *                           {@code insertBeforeItemId} is {@link MediaQueueItem#INVALID_ITEM_ID}.
+     *                           <p>
+     *                           For example:
+     *                           <p>
+     *                           If insertBeforeItemId is not specified <br>
+     *                           Existing queue: "A","D","G","H","B","E" <br>
+     *                           itemIds: "D","H","B" <br>
+     *                           New Order: "A","G","E","D","H","B" <br>
+     *                           <p>
+     *                           If insertBeforeItemId is "A" <br>
+     *                           Existing queue: "A","D","G","H","B" <br>
+     *                           itemIds: "D","H","B" <br>
+     *                           New Order: "D","H","B","A","G","E" <br>
+     *                           <p>
+     *                           If insertBeforeItemId is "G" <br>
+     *                           Existing queue: "A","D","G","H","B" <br>
+     *                           itemIds: "D","H","B" <br>
+     *                           New Order: "A","D","H","B","G","E" <br>
+     *                           <p>
+     *                           If any of the items does not exist it will be ignored.
+     *                           Must not be {@code null} or empty.
      * @param insertBeforeItemId ID of the item that will be located immediately after the reordered
      *                           list. If set to {@link MediaQueueItem#INVALID_ITEM_ID}, the
      *                           reordered list will be appended at the end of the queue.
-     * @param customData Custom application-specific data to pass along with the request. May be
-     *                   {@code null}.
+     * @param customData         Custom application-specific data to pass along with the request. May be
+     *                           {@code null}.
      * @throws TransientNetworkDisconnectionException
      * @throws NoConnectionException
      */
     public void queueReorderItems(final int[] itemIdsToReorder, final int insertBeforeItemId,
-            final JSONObject customData)
+                                  final JSONObject customData)
             throws TransientNetworkDisconnectionException, NoConnectionException,
             IllegalArgumentException {
         LOGD(TAG, "queueReorderItems");
@@ -1365,11 +1361,11 @@ public class VideoCastManager extends BaseCastManager
      * was removed by another sender before calling this function, this function will silently
      * return without sending a request to the receiver.
      *
-     * @param itemId The ID of the item to be moved.
-     * @param newIndex The new index of the item. If the value is negative, an error will be
-     *                 returned. If the value is out of bounds, or becomes out of bounds because the
-     *                 queue was shortened by another sender while this request is in progress, the
-     *                 item will be moved to the end of the queue.
+     * @param itemId     The ID of the item to be moved.
+     * @param newIndex   The new index of the item. If the value is negative, an error will be
+     *                   returned. If the value is out of bounds, or becomes out of bounds because the
+     *                   queue was shortened by another sender while this request is in progress, the
+     *                   item will be moved to the end of the queue.
      * @param customData Custom application-specific data to pass along with the request. May be
      *                   {@code null}.
      * @throws TransientNetworkDisconnectionException
@@ -1395,7 +1391,7 @@ public class VideoCastManager extends BaseCastManager
     /**
      * Appends a new media item to the end of the queue.
      *
-     * @param item The item to append. Must not be {@code null}.
+     * @param item       The item to append. Must not be {@code null}.
      * @param customData Custom application-specific data to pass along with the request. May be
      *                   {@code null}.
      * @throws TransientNetworkDisconnectionException
@@ -1480,17 +1476,17 @@ public class VideoCastManager extends BaseCastManager
      * Inserts an item in the queue and starts the playback of that newly inserted item. It is
      * assumed that we are inserting  before the "current item"
      *
-     * @param item The item to be inserted
+     * @param item               The item to be inserted
      * @param insertBeforeItemId ID of the item that will be located immediately after the inserted
-     * and is assumed to be the "current item"
-     * @param customData Custom application-specific data to pass along with the request. May be
-     *                   {@code null}.
+     *                           and is assumed to be the "current item"
+     * @param customData         Custom application-specific data to pass along with the request. May be
+     *                           {@code null}.
      * @throws TransientNetworkDisconnectionException
      * @throws NoConnectionException
      * @throws IllegalArgumentException
      */
     public void queueInsertBeforeCurrentAndPlay(MediaQueueItem item, int insertBeforeItemId,
-            final JSONObject customData)
+                                                final JSONObject customData)
             throws TransientNetworkDisconnectionException, NoConnectionException {
         checkConnectivity();
         if (mRemoteMediaPlayer == null) {
@@ -1860,10 +1856,8 @@ public class VideoCastManager extends BaseCastManager
 
                         @Override
                         public void onQueueStatusUpdated() {
-                            LOGD(TAG,
-                                    "RemoteMediaPlayer::onQueueStatusUpdated() is "
-                                            + "reached");
-                            mMediaStatus = mRemoteMediaPlayer.getMediaStatus() != null ? new com.noriginmedia.cast.wrap.MediaStatus(mRemoteMediaPlayer.getMediaStatus()) : null;
+                            LOGD(TAG, "RemoteMediaPlayer::onQueueStatusUpdated() is reached");
+                            mMediaStatus = (mRemoteMediaPlayer != null && mRemoteMediaPlayer.getMediaStatus() != null) ? new com.noriginmedia.cast.wrap.MediaStatus(mRemoteMediaPlayer.getMediaStatus()) : null;
                             if (mMediaStatus != null
                                     && mMediaStatus.getMediaStatus() != null
                                     && mMediaStatus.getMediaStatus().getQueueItems() != null) {
@@ -1945,14 +1939,14 @@ public class VideoCastManager extends BaseCastManager
      * Returns the Idle reason, defined in <code>MediaStatus.IDLE_*</code>. Note that the returned
      * value is only meaningful if the status is truly <code>MediaStatus.PLAYER_STATE_IDLE
      * </code>
-     *
+     * <p>
      * <p>Possible values are:
      * <ul>
-     *     <li>IDLE_REASON_NONE</li>
-     *     <li>IDLE_REASON_FINISHED</li>
-     *     <li>IDLE_REASON_CANCELED</li>
-     *     <li>IDLE_REASON_INTERRUPTED</li>
-     *     <li>IDLE_REASON_ERROR</li>
+     * <li>IDLE_REASON_NONE</li>
+     * <li>IDLE_REASON_FINISHED</li>
+     * <li>IDLE_REASON_CANCELED</li>
+     * <li>IDLE_REASON_INTERRUPTED</li>
+     * <li>IDLE_REASON_ERROR</li>
      * </ul>
      */
     public int getIdleReason() {
@@ -2014,10 +2008,10 @@ public class VideoCastManager extends BaseCastManager
      * <code>messageId == 0</code>, then an auto-generated unique identifier will be created and
      * returned for the message.
      *
-     * @throws IllegalStateException If the namespace is empty or null
-     * @throws NoConnectionException If no connectivity to the device exists
+     * @throws IllegalStateException                  If the namespace is empty or null
+     * @throws NoConnectionException                  If no connectivity to the device exists
      * @throws TransientNetworkDisconnectionException If framework is still trying to recover from
-     * a possibly transient loss of network
+     *                                                a possibly transient loss of network
      */
     public void sendDataMessage(String message) throws TransientNetworkDisconnectionException,
             NoConnectionException {
@@ -2099,7 +2093,7 @@ public class VideoCastManager extends BaseCastManager
                 startNotificationService();
             } else if (mState == MediaStatus.PLAYER_STATE_IDLE) {
                 LOGD(TAG, "onRemoteMediaPlayerStatusUpdated(): Player status = IDLE with reason: "
-                        + mIdleReason );
+                        + mIdleReason);
                 updateMediaSession(false);
                 switch (mIdleReason) {
                     case MediaStatus.IDLE_REASON_FINISHED:
@@ -2157,6 +2151,7 @@ public class VideoCastManager extends BaseCastManager
     private void onRemoteMediaPreloadStatusUpdated() {
         MediaQueueItem item = null;
         mMediaStatus = mRemoteMediaPlayer.getMediaStatus() != null ? new com.noriginmedia.cast.wrap.MediaStatus(mRemoteMediaPlayer.getMediaStatus()) : null;
+
         if (mMediaStatus != null) {
             item = mMediaStatus.getMediaStatus().getQueueItemById(mMediaStatus.getMediaStatus().getPreloadedItemId());
         }
@@ -2262,7 +2257,7 @@ public class VideoCastManager extends BaseCastManager
                         LOGI(TAG, "MediaSessionCompat.Callback() toggle()");
                         togglePlayback();
                     } catch (CastException | TransientNetworkDisconnectionException |
-                        NoConnectionException e) {
+                            NoConnectionException e) {
                         LOGE(TAG, "MediaSessionCompat.Callback(): Failed to toggle playback", e);
                     }
                 }
@@ -2377,7 +2372,7 @@ public class VideoCastManager extends BaseCastManager
             mLockScreenFetchTask = new FetchBitmapTask(screenSize.x, screenSize.y, false) {
                 @Override
                 protected void onPostExecute(Bitmap bitmap) {
-                    if (mMediaSessionCompat != null) {
+                    if (bitmap != null && mMediaSessionCompat != null) {
                         MediaMetadataCompat currentMetadata = mMediaSessionCompat.getController()
                                 .getMetadata();
                         MediaMetadataCompat.Builder newBuilder = currentMetadata == null
@@ -2393,6 +2388,7 @@ public class VideoCastManager extends BaseCastManager
             mLockScreenFetchTask.execute(imgUrl);
         }
     }
+
     /*
      * Updates the playback status of the Media Session
      */
@@ -2485,7 +2481,7 @@ public class VideoCastManager extends BaseCastManager
                 mMediaSessionIconFetchTask = new FetchBitmapTask() {
                     @Override
                     protected void onPostExecute(Bitmap bitmap) {
-                        if (mMediaSessionCompat != null) {
+                        if (bitmap != null && mMediaSessionCompat != null) {
                             MediaMetadataCompat currentMetadata = mMediaSessionCompat
                                     .getController().getMetadata();
                             MediaMetadataCompat.Builder newBuilder = currentMetadata == null
@@ -2578,7 +2574,7 @@ public class VideoCastManager extends BaseCastManager
      * @see {@link #removeMiniController(IMiniController)}
      */
     public void addMiniController(IMiniController miniController,
-            OnMiniControllerChangedListener onChangedListener) {
+                                  OnMiniControllerChangedListener onChangedListener) {
         if (miniController != null) {
             boolean result;
             synchronized (mMiniControllers) {
@@ -2600,6 +2596,9 @@ public class VideoCastManager extends BaseCastManager
                 LOGD(TAG, "Attempting to adding " + miniController + " but it was already "
                         + "registered, skipping this step");
             }
+            if (mProgressHandler == null || mProgressHandler.isCancelled()) {
+                restartProgressTimer();
+            }
         }
     }
 
@@ -2619,6 +2618,9 @@ public class VideoCastManager extends BaseCastManager
             listener.setOnMiniControllerChangedListener(null);
             synchronized (mMiniControllers) {
                 mMiniControllers.remove(listener);
+                if (mMiniControllers.isEmpty()) {
+                    stopProgressTimer();
+                }
             }
         }
     }
@@ -2652,7 +2654,7 @@ public class VideoCastManager extends BaseCastManager
 
     @Override
     public void onDisconnected(boolean stopAppOnExit, boolean clearPersistedConnectionData,
-            boolean setDefaultRoute) {
+                               boolean setDefaultRoute) {
         super.onDisconnected(stopAppOnExit, clearPersistedConnectionData, setDefaultRoute);
         updateMiniControllersVisibility(false);
         if (clearPersistedConnectionData && !mConnectionSuspended) {
@@ -2700,14 +2702,15 @@ public class VideoCastManager extends BaseCastManager
      * Clients can call this method to delegate handling of the volume. Clients should override
      * {@code dispatchEvent} and call this method:
      * <pre>
-     public boolean dispatchKeyEvent(KeyEvent event) {
-         if (mCastManager.onDispatchVolumeKeyEvent(event, VOLUME_DELTA)) {
-            return true;
-         }
-         return super.dispatchKeyEvent(event);
-     }
+     * public boolean dispatchKeyEvent(KeyEvent event) {
+     * if (mCastManager.onDispatchVolumeKeyEvent(event, VOLUME_DELTA)) {
+     * return true;
+     * }
+     * return super.dispatchKeyEvent(event);
+     * }
      * </pre>
-     * @param event The dispatched event.
+     *
+     * @param event       The dispatched event.
      * @param volumeDelta The amount by which volume should be increased or decreased in each step
      * @return <code>true</code> if volume is handled by the library, <code>false</code> otherwise.
      */
@@ -3006,28 +3009,7 @@ public class VideoCastManager extends BaseCastManager
         return mMediaQueue;
     }
 
-    private void stopProgressTimer() {
-        LOGD(TAG, "Stopped TrickPlay Timer");
-        if (mProgressTask != null) {
-            mProgressTask.cancel();
-            mProgressTask = null;
-        }
-        if (mProgressTimer != null) {
-            mProgressTimer.cancel();
-            mProgressTimer = null;
-        }
-    }
-
-    private void restartProgressTimer() {
-        stopProgressTimer();
-        mProgressTimer = new Timer();
-        mProgressTask = new UpdateProgressTask();
-        mProgressTimer.scheduleAtFixedRate(mProgressTask, 100, PROGRESS_UPDATE_INTERVAL_MS);
-        LOGD(TAG, "Restarted Progress Timer");
-    }
-
-    private class UpdateProgressTask extends TimerTask {
-
+    final private Runnable mProgressRunnable = new Runnable() {
         @Override
         public void run() {
             int currentPos;
@@ -3045,6 +3027,21 @@ public class VideoCastManager extends BaseCastManager
                 LOGE(TAG, "Failed to update the progress tracker due to network issues", e);
             }
         }
+    };
+
+    private void restartProgressTimer() {
+        stopProgressTimer();
+        mProgressHandler = scheduler
+                .scheduleAtFixedRate(mProgressRunnable, 100, PROGRESS_UPDATE_INTERVAL_MS,
+                        TimeUnit.MILLISECONDS);
+        LOGD(TAG, "Restarted Progress Timer");
+    }
+
+    private void stopProgressTimer() {
+        LOGD(TAG, "Stopped TrickPlay Timer");
+        if (mProgressHandler != null && !mProgressHandler.isCancelled()) {
+            mProgressHandler.cancel(true);
+        }
     }
 
     /**
@@ -3057,7 +3054,7 @@ public class VideoCastManager extends BaseCastManager
             }
         }
 
-        for(ProgressWatcher watcher : mProgressWatchers) {
+        for (ProgressWatcher watcher : mProgressWatchers) {
             watcher.setProgress(currentPosition, duration);
         }
     }
@@ -3075,7 +3072,7 @@ public class VideoCastManager extends BaseCastManager
         return mDataNamespace;
     }
 
-    public static JSONObject buildCustomData(com.noriginmedia.cast.wrap.MediaMetadata mMediaMetadata){
+    public static JSONObject buildCustomData(com.noriginmedia.cast.wrap.MediaMetadata mMediaMetadata) {
         return null;
     }
 }

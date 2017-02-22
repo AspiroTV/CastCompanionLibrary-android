@@ -101,11 +101,11 @@ public class CastMediaRouterCallback extends MediaRouter.Callback {
 
     private void notifyRouteAvailabilityChangedIfNeeded(MediaRouter router) {
         boolean routeAvailable = isRouteAvailable(router);
-        if (routeAvailable != mRouteAvailable) {
+        //if (routeAvailable != mRouteAvailable) {
             // availability of routes have changed
             mRouteAvailable = routeAvailable;
             mCastManager.onCastAvailabilityChanged(mRouteAvailable);
-        }
+        //}
     }
 
     private boolean isRouteAvailable(MediaRouter router) {

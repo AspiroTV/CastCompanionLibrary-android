@@ -58,7 +58,7 @@ public class ReconnectionService extends Service {
     public static final boolean enabled = true;
 
     private static final long EPSILON_MS = 500;
-    private static final int RECONNECTION_ATTEMPT_PERIOD_S = 15;
+    private static final int RECONNECTION_ATTEMPT_PERIOD_S = 30;
     private BroadcastReceiver mScreenOnOffBroadcastReceiver;
     private VideoCastManager mCastManager;
     private BroadcastReceiver mWifiBroadcastReceiver;

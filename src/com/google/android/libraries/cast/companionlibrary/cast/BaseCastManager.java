@@ -208,7 +208,7 @@ public abstract class BaseCastManager
 
         mMediaRouterCallback = new CastMediaRouterCallback(this);
         mMediaRouter.addCallback(mMediaRouteSelector, mMediaRouterCallback,
-                MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY);
+                MediaRouter.CALLBACK_FLAG_FORCE_DISCOVERY);
     }
 
     /**
@@ -500,7 +500,7 @@ public abstract class BaseCastManager
      */
     public final void startCastDiscovery() {
         mMediaRouter.addCallback(mMediaRouteSelector, mMediaRouterCallback,
-                MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY);
+                MediaRouter.CALLBACK_FLAG_FORCE_DISCOVERY);
     }
 
     /**

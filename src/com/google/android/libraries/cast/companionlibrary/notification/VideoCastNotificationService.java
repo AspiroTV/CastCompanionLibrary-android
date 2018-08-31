@@ -16,8 +16,19 @@
 
 package com.google.android.libraries.cast.companionlibrary.notification;
 
-import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGD;
-import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGE;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.Service;
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.IBinder;
+import android.support.v4.app.NotificationCompat;
 
 import com.google.android.gms.cast.MediaInfo;
 import com.google.android.gms.cast.MediaMetadata;
@@ -30,29 +41,17 @@ import com.google.android.libraries.cast.companionlibrary.cast.VideoCastManager;
 import com.google.android.libraries.cast.companionlibrary.cast.callbacks.VideoCastConsumerImpl;
 import com.google.android.libraries.cast.companionlibrary.cast.exceptions.CastException;
 import com.google.android.libraries.cast.companionlibrary.cast.exceptions.NoConnectionException;
-import com.google.android.libraries.cast.companionlibrary.cast.exceptions
-        .TransientNetworkDisconnectionException;
+import com.google.android.libraries.cast.companionlibrary.cast.exceptions.TransientNetworkDisconnectionException;
 import com.google.android.libraries.cast.companionlibrary.remotecontrol.VideoIntentReceiver;
 import com.google.android.libraries.cast.companionlibrary.utils.FetchBitmapTask;
 import com.google.android.libraries.cast.companionlibrary.utils.LogUtils;
 import com.google.android.libraries.cast.companionlibrary.utils.Utils;
 
-import android.app.Notification;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
-import android.app.Service;
-import android.content.Context;
-import android.content.Intent;
-import android.graphics.Bitmap;
-import android.net.Uri;
-import android.os.Bundle;
-import android.os.IBinder;
-import android.support.v4.app.TaskStackBuilder;
-import android.support.v7.app.NotificationCompat;
-import android.text.TextUtils;
-
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+
+import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGD;
+import static com.google.android.libraries.cast.companionlibrary.utils.LogUtils.LOGE;
 
 /**
  * A service to provide status bar Notifications when we are casting. For JB+ versions,
@@ -86,6 +85,7 @@ public class VideoCastNotificationService extends Service {
 
     private static final long TEN_SECONDS_MILLIS = TimeUnit.SECONDS.toMillis(10);
     private static final long THIRTY_SECONDS_MILLIS = TimeUnit.SECONDS.toMillis(30);
+    private static final String CHANNEL_ID = "ChromecastNotification";
 
     private Bitmap mVideoArtBitmap;
     private boolean mIsPlaying;
@@ -263,14 +263,16 @@ public class VideoCastNotificationService extends Service {
         String castingTo = getResources().getString(R.string.ccl_casting_to_device,
                 mCastManager.getDeviceName());
 
+        String channel = createNotificationChannel();
+
         NotificationCompat.Builder builder
-                = (NotificationCompat.Builder) new NotificationCompat.Builder(this)
+                = (NotificationCompat.Builder) new NotificationCompat.Builder(this, channel)
                 .setSmallIcon(R.drawable.ic_stat_action_notification)
                 .setContentTitle(metadata.getString(MediaMetadata.KEY_TITLE))
                 .setContentText(castingTo)
                 .setContentIntent(getContentIntent(info))
                 .setLargeIcon(bitmap)
-                .setStyle(new NotificationCompat.MediaStyle()
+                .setStyle(new android.support.v4.media.app.NotificationCompat.MediaStyle()
                         .setShowActionsInCompactView(mNotificationCompactActionsArray)
                         .setMediaSession(mCastManager.getMediaSessionCompatToken()))
                 .setOngoing(true)
@@ -303,6 +305,24 @@ public class VideoCastNotificationService extends Service {
 
         mNotification = builder.build();
 
+    }
+
+    private String createNotificationChannel() {
+        // Create the NotificationChannel, but only on API 26+ because
+        // the NotificationChannel class is new and not in the support library
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CharSequence name = getString(R.string.channel_name);
+            String description = getString(R.string.channel_description);
+            int importance = NotificationManager.IMPORTANCE_DEFAULT;
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, importance);
+            channel.setDescription(description);
+            // Register the channel with the system; you can't change the importance
+            // or other notification behaviors after this
+            NotificationManager notificationManager = getSystemService(NotificationManager.class);
+            notificationManager.createNotificationChannel(channel);
+            return CHANNEL_ID;
+        }
+        return "";
     }
 
     /**
